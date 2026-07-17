@@ -63,6 +63,7 @@ svg { flex: 0 0 auto; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 900; letter-spacing: -.7px; }
 .brand > img { width: 28px; height: 28px; object-fit: contain; border-radius: 8px; box-shadow: 0 0 24px rgba(198,255,46,.16); }
 .auth-brand { position: relative; z-index: 1; }
+.auth-brand > img { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .auth-pitch { position: relative; z-index: 1; max-width: 580px; }
 .eyebrow { display: inline-flex; align-items: center; gap: 7px; color: var(--green); font-size: 12px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
 .auth-pitch h1 { margin: 20px 0 18px; max-width: 620px; font-size: clamp(44px,5vw,72px); line-height: .98; letter-spacing: -.065em; }

@@ -31,7 +31,7 @@ function GoogleButton({ onClick, loading = false }) {
 function AuthSocialActions() {
   const xUrl = import.meta.env.VITE_X_URL || "https://x.com/PanAIApp";
   const ponsUrl = import.meta.env.VITE_PONS_TOKEN_URL || "https://pons.family";
-  return <><a className="auth-social-button auth-social-pan" href={ponsUrl} target="_blank" rel="noreferrer"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" />GET $PAN</a><a className="auth-social-button auth-social-x" href={xUrl} target="_blank" rel="noreferrer"><img src={`${import.meta.env.BASE_URL}X.png`} alt="" />X</a></>;
+  return <><a className="auth-social-button auth-social-pan" href={ponsUrl} target="_blank" rel="noreferrer"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" />GET $PAN</a><a className="auth-social-button auth-social-x" href={xUrl} target="_blank" rel="noreferrer"><img src={`${import.meta.env.BASE_URL}X.png`} alt="" />PanAiApp</a></>;
 }
 
 export function LoginPage() {
