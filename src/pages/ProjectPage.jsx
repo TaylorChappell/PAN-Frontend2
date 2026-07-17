@@ -93,7 +93,10 @@ export function ProjectPage() {
     if (!data) return;
     const fields = projectFields(data);
     setProject((old) => ({ ...old, ...fields, messages: old.messages }));
-  }, []);
+    if (fields.id) {
+      setProjects((old) => old.map((item) => (item.id || item.projectId) === fields.id ? { ...item, ...fields } : item));
+    }
+  }, [setProjects]);
 
   useEffect(() => {
     if (!projectId) {
@@ -122,6 +125,35 @@ export function ProjectPage() {
     const timer = window.setInterval(refresh, 1_500);
     return () => { active = false; window.clearInterval(timer); };
   }, [mergeServerProject, project.id, thinking]);
+  useEffect(() => {
+    if (!project.id || project.status !== "launching") return undefined;
+    let active = true;
+    let timer = null;
+    const refreshLaunchStatus = async () => {
+      try {
+        const latest = await endpoints.projects.launchStatus(project.id);
+        if (!active) return;
+        const fields = projectFields(latest);
+        mergeServerProject(latest);
+        const isLive = fields.status === "live" || Boolean(fields.contractAddress || fields.tokenAddress);
+        if (isLive) {
+          reload();
+          return;
+        }
+        if (fields.status === "failed") {
+          setError("The launch transaction failed. Check the operations log before trying again.");
+          reload();
+          return;
+        }
+      } catch { /* Keep the current launch state and retry while the transaction confirms. */ }
+      if (active) timer = window.setTimeout(refreshLaunchStatus, 2_000);
+    };
+    refreshLaunchStatus();
+    return () => {
+      active = false;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [mergeServerProject, project.id, project.status, reload]);
   useEffect(() => {
     const input = messageInput.current;
     if (!input) return;
@@ -344,7 +376,7 @@ export function ProjectPage() {
 function CoinStats({ project }) {
   const address = project.contractAddress || project.tokenAddress;
   const [claiming, setClaiming] = useState(false); const [notice, setNotice] = useState(""); const [stats, setStats] = useState(null);
-  const terminal = project.terminalUrl || `${import.meta.env.VITE_GMGN_BASE_URL || "https://gmgn.ai/eth/token"}/${address}`;
+  const terminal = address ? `https://gmgn.ai/robinhood/token/${address.toLowerCase()}` : "https://gmgn.ai/robinhood";
   useEffect(() => {
     let active = true;
     const load = () => endpoints.projects.stats(project.id).then((data) => active && setStats(data?.stats || null)).catch((error) => active && setNotice(error.message));

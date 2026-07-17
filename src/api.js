@@ -133,6 +133,7 @@ export const endpoints = {
       return waitForAiRun(created?.run || created);
     },
     launch: (id, payload) => api(`/api/projects/${encodeURIComponent(id)}/launch`, { method: "POST", body: json({ walletMode: payload.walletMode === "connected" ? "external" : "managed", devBuyEth: String(payload.devBuyEth || 0), feeWalletAddress: payload.feeWalletAddress?.trim() || undefined, idempotencyKey: crypto.randomUUID() }) }),
+    launchStatus: (id) => api(`/api/projects/${encodeURIComponent(id)}/launch-status`, { method: "POST", body: json({}) }),
     claimFees: (id, walletMode = "managed") => api(`/api/projects/${encodeURIComponent(id)}/creator-fees/claim`, { method: "POST", body: json({ walletMode, idempotencyKey: crypto.randomUUID() }) }),
   },
   images: {
