@@ -107,12 +107,14 @@ export const endpoints = {
     create: (payload) => api("/api/projects", { method: "POST", body: json(payload) }),
     update: (id, payload) => api(`/api/projects/${encodeURIComponent(id)}`, { method: "PATCH", body: json(payload) }),
     remove: (id) => api(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    stats: (id) => api(`/api/projects/${encodeURIComponent(id)}/stats`),
+    launchPreview: (id, payload) => api("/api/launches/preview", { method: "POST", body: json({ projectId: id, walletMode: payload.walletMode === "connected" ? "external" : "managed", devBuyEth: String(payload.devBuyEth || 0) }) }),
     message: async (id, payload) => {
       const created = await api(`/api/projects/${encodeURIComponent(id)}/chat`, { method: "POST", body: json({ prompt: payload.message, performance: payload.performance, attachments: payload.attachments, idempotencyKey: crypto.randomUUID() }) });
       return waitForAiRun(created?.run || created);
     },
-    launch: (id, payload) => api(`/api/projects/${encodeURIComponent(id)}/launch`, { method: "POST", body: json({ walletMode: payload.walletMode === "connected" ? "external" : "managed", devBuyEth: String(payload.devBuyEth || 0), idempotencyKey: crypto.randomUUID() }) }),
-    claimFees: (id) => api(`/api/projects/${encodeURIComponent(id)}/creator-fees/claim`, { method: "POST" }),
+    launch: (id, payload) => api(`/api/projects/${encodeURIComponent(id)}/launch`, { method: "POST", body: json({ walletMode: payload.walletMode === "connected" ? "external" : "managed", devBuyEth: String(payload.devBuyEth || 0), feeWalletAddress: payload.feeWalletAddress?.trim() || undefined, idempotencyKey: crypto.randomUUID() }) }),
+    claimFees: (id, walletMode = "managed") => api(`/api/projects/${encodeURIComponent(id)}/creator-fees/claim`, { method: "POST", body: json({ walletMode, idempotencyKey: crypto.randomUUID() }) }),
   },
   images: {
     generate: async (payload) => {
@@ -160,10 +162,10 @@ export const endpoints = {
     assetUrl: (path) => path?.startsWith("http") ? path : `${API_BASE}${path || ""}`,
   },
   support: {
-    list: () => api("/api/support/tickets"),
-    create: (payload) => api("/api/support/tickets", { method: "POST", body: json(payload) }),
-    reply: (id, payload) => api(`/api/support/tickets/${encodeURIComponent(id)}/messages`, { method: "POST", body: json(payload) }),
-    close: (id) => api(`/api/support/tickets/${encodeURIComponent(id)}/close`, { method: "POST" }),
+    list: () => api("/api/support"),
+    create: (payload) => api("/api/support", { method: "POST", body: json(payload) }),
+    reply: (id, payload) => api(`/api/support/${encodeURIComponent(id)}/messages`, { method: "POST", body: json(payload) }),
+    close: (id) => api("/api/support", { method: "PATCH", body: json({ id, action: "close" }) }),
   },
   admin: {
     overview: () => api("/api/admin/overview"),

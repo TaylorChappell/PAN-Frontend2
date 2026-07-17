@@ -46,7 +46,7 @@ export function ProjectPage() {
   const [launchOpen, setLaunchOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
   const [imagePrompt, setImagePrompt] = useState("");
-  const [launch, setLaunch] = useState({ devBuyEth: "0", maxFeeEth: "", walletMode: "account" });
+  const [launch, setLaunch] = useState({ devBuyEth: "0", feeWalletAddress: "", walletMode: "account" });
   const saveTimer = useRef(null);
   const coinImageInput = useRef(null);
   const chatImageInput = useRef(null);
@@ -167,7 +167,9 @@ export function ProjectPage() {
     setThinking(true); setError("");
     try {
       const id = await ensureProject();
-      const payload = { devBuyEth: Number(launch.devBuyEth || 0), maxFeeEth: launch.maxFeeEth ? Number(launch.maxFeeEth) : null, walletMode: launch.walletMode };
+      const payload = { devBuyEth: Number(launch.devBuyEth || 0), feeWalletAddress: launch.feeWalletAddress, walletMode: launch.walletMode };
+      const quote = await endpoints.projects.launchPreview(id, payload);
+      if (quote?.preview?.canAfford === false) throw new Error(`The operations wallet does not have enough ETH for the ${quote.preview.fees?.totalEth || "current"} ETH launch total.`);
       const data = await endpoints.projects.launch(id, payload);
       const result = data?.result || data;
       if (result?.signingRequest) {
@@ -204,15 +206,22 @@ export function ProjectPage() {
           <Button className="launch-button" disabled={complete !== 3} onClick={() => setLaunchOpen(true)}><Rocket />Launch coin</Button><small className="button-caption">{complete === 3 ? "Review launch funding and wallet" : "Complete the three required details"}</small></>}
       </aside>
       {imageOpen ? <Modal title="Generate coin artwork" subtitle="OpenAI image generation uses your selected performance level." onClose={() => setImageOpen(false)}><div className="modal-body"><label className="field"><span>Describe the image</span><textarea rows="5" value={imagePrompt} onChange={(e) => setImagePrompt(e.target.value)} placeholder="A neon green frog mascot, bold coin logo, dark background…" /></label><div className="modal-actions"><Button variant="ghost" onClick={() => setImageOpen(false)}>Cancel</Button><Button loading={thinking} disabled={!imagePrompt.trim()} onClick={generateImage}><Sparkles />Generate image</Button></div></div></Modal> : null}
-      {launchOpen ? <Modal title={`Launch ${project.coinName}`} subtitle="Review every value before creating the on-chain transaction." onClose={() => setLaunchOpen(false)}><div className="modal-body"><div className="launch-summary"><span>{project.imageUrl ? <img src={mediaUrl(project.imageUrl)} alt="" /> : <Coins />}</span><div><strong>{project.coinName}</strong><small>${project.ticker} · Robinhood Chain</small></div></div><div className="two-fields"><Field label="Dev buy (ETH)" optional><input type="number" min="0" step="0.001" value={launch.devBuyEth} onChange={(e) => setLaunch({ ...launch, devBuyEth: e.target.value })}/></Field><Field label="Maximum fee (ETH)" optional><input type="number" min="0" step="0.001" value={launch.maxFeeEth} onChange={(e) => setLaunch({ ...launch, maxFeeEth: e.target.value })} placeholder="Use estimate" /></Field></div><label className="field"><span>Launch wallet</span><select value={launch.walletMode} onChange={(e) => setLaunch({ ...launch, walletMode: e.target.value })}><option value="account">PAN account wallet</option><option value="connected">Connected external wallet</option></select></label>{launch.walletMode === "connected" ? <Notice>Your connected wallet will ask you to confirm the launch transaction. PAN never receives its private key.</Notice> : null}<div className="modal-actions"><Button variant="ghost" onClick={() => setLaunchOpen(false)}>Cancel</Button><Button loading={thinking} onClick={launchCoin}><Rocket />Confirm launch</Button></div></div></Modal> : null}
+      {launchOpen ? <Modal title={`Launch ${project.coinName}`} subtitle="PAN verifies the live Pons fee and developer-buy limit before creating the transaction." onClose={() => setLaunchOpen(false)}><div className="modal-body"><div className="launch-summary"><span>{project.imageUrl ? <img src={mediaUrl(project.imageUrl)} alt="" /> : <Coins />}</span><div><strong>{project.coinName}</strong><small>${project.ticker} · Robinhood Chain</small></div></div><div className="two-fields"><Field label="Dev buy (ETH)" optional><input type="number" min="0" step="0.001" value={launch.devBuyEth} onChange={(e) => setLaunch({ ...launch, devBuyEth: e.target.value })}/></Field><Field label="Creator fee wallet" optional><input value={launch.feeWalletAddress} onChange={(e) => setLaunch({ ...launch, feeWalletAddress: e.target.value.trim() })} placeholder="Defaults to launch wallet" /></Field></div><label className="field"><span>Launch wallet</span><select value={launch.walletMode} onChange={(e) => setLaunch({ ...launch, walletMode: e.target.value })}><option value="account">PAN account wallet</option><option value="connected">Connected external wallet</option></select></label>{launch.walletMode === "connected" ? <Notice>Your connected wallet will ask you to confirm the launch transaction. PAN never receives its private key.</Notice> : null}<div className="modal-actions"><Button variant="ghost" onClick={() => setLaunchOpen(false)}>Cancel</Button><Button loading={thinking} disabled={Boolean(launch.feeWalletAddress) && !/^0x[a-fA-F0-9]{40}$/.test(launch.feeWalletAddress)} onClick={launchCoin}><Rocket />Verify fee and launch</Button></div></div></Modal> : null}
     </div>
   );
 }
 
 function CoinStats({ project }) {
   const address = project.contractAddress || project.tokenAddress;
-  const [claiming, setClaiming] = useState(false); const [notice, setNotice] = useState("");
+  const [claiming, setClaiming] = useState(false); const [notice, setNotice] = useState(""); const [stats, setStats] = useState(null);
   const terminal = project.terminalUrl || `${import.meta.env.VITE_GMGN_BASE_URL || "https://gmgn.ai/eth/token"}/${address}`;
+  useEffect(() => {
+    let active = true;
+    const load = () => endpoints.projects.stats(project.id).then((data) => active && setStats(data?.stats || null)).catch((error) => active && setNotice(error.message));
+    load(); const timer = window.setInterval(load, 30_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [project.id]);
   const claim = async () => { setClaiming(true); try { await endpoints.projects.claimFees(project.id); setNotice("Creator fee claim submitted."); } catch (e) { setNotice(e.message); } finally { setClaiming(false); } };
-  return <><div className="panel-title"><div><p>LIVE COIN</p><h2>Coin stats</h2></div><span className="status-pill live">Live</span></div><div className="coin-identity">{project.imageUrl ? <img src={mediaUrl(project.imageUrl)} alt="" /> : <span><Coins /></span>}<div><h3>{project.coinName}</h3><p>${project.ticker}</p></div></div>{notice ? <Notice type={notice.includes("submitted") ? "success" : "error"}>{notice}</Notice> : null}<div className="stats-list"><div><span>Market cap</span><strong>{money(project.marketCapUsd)}</strong></div><div><span>24h volume</span><strong>{money(project.volume24hUsd || project.volumeUsd)}</strong></div><div><span>Creator fees</span><strong>{money(project.creatorFeesUsd)}</strong></div><div><span>Token address</span><strong className="mono">{address ? `${address.slice(0, 8)}…${address.slice(-6)}` : "Pending"}</strong></div></div><Button variant="secondary" loading={claiming} onClick={claim}><Wallet />Claim creator fees</Button><a className="button button-primary launch-button" href={terminal} target="_blank" rel="noreferrer">View coin <ArrowUpRight /></a></>;
+  const creatorFeeEth = stats?.creatorFeesWethWei ? Number(BigInt(stats.creatorFeesWethWei)) / 1e18 : 0;
+  return <><div className="panel-title"><div><p>LIVE COIN</p><h2>Coin stats</h2></div><span className="status-pill live">Live</span></div><div className="coin-identity">{project.imageUrl ? <img src={mediaUrl(project.imageUrl)} alt="" /> : <span><Coins /></span>}<div><h3>{project.coinName}</h3><p>${project.ticker}</p></div></div>{notice ? <Notice type={notice.includes("submitted") ? "success" : "error"}>{notice}</Notice> : null}<div className="stats-list"><div><span>Market cap</span><strong>{money(stats?.marketCapUsd)}</strong></div><div><span>24h volume</span><strong>{money(stats?.volume24hUsd)}</strong></div><div><span>Creator fees</span><strong>{creatorFeeEth.toFixed(6)} ETH</strong></div><div><span>Token address</span><strong className="mono">{address ? `${address.slice(0, 8)}…${address.slice(-6)}` : "Pending"}</strong></div></div><Button variant="secondary" loading={claiming} onClick={claim}><Wallet />Claim creator fees</Button><a className="button button-primary launch-button" href={terminal} target="_blank" rel="noreferrer">View coin <ArrowUpRight /></a></>;
 }

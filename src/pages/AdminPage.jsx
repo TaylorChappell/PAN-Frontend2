@@ -78,7 +78,7 @@ export function AdminPage() {
     <header className="page-title"><div><p>ADMINISTRATION</p><h1>PAN.AI operations</h1><span>Manage users, balances, support, coins, storage, AI usage and operational recovery.</span></div><Button variant="secondary" loading={refreshing} onClick={() => load({ quiet: true })}><RefreshCw/>Refresh</Button></header>
     {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
     <nav className="admin-tabs">{tabs.map(([id, label, Icon]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}><Icon/>{label}</button>)}</nav>
-    {tab === "overview" ? <OverviewPanel metrics={metrics} configuration={overview?.configuration || {}} /> : null}
+    {tab === "overview" ? <OverviewPanel metrics={metrics} configuration={overview?.configuration || {}} requirements={overview?.requirements || {}} /> : null}
     {tab === "users" ? <UsersPanel users={users} query={query} setQuery={setQuery} search={() => load({ quiet: true })} grant={setGrantUser} /> : null}
     {tab === "tickets" ? <TicketsPanel tickets={tickets} selected={selectedTicket} select={setSelectedTicketId} reload={() => load({ quiet: true })} /> : null}
     {tab === "projects" ? <ProjectsPanel projects={projects} /> : null}
@@ -88,7 +88,7 @@ export function AdminPage() {
   </div>;
 }
 
-function OverviewPanel({ metrics, configuration }) {
+function OverviewPanel({ metrics, configuration, requirements }) {
   const cards = [
     ["Total users", Number(metrics.users || 0).toLocaleString(), Users],
     ["Credits outstanding", Number(metrics.creditsOutstanding || 0).toLocaleString(), Coins],
@@ -104,7 +104,7 @@ function OverviewPanel({ metrics, configuration }) {
     <section className="metric-grid admin-metrics admin-metrics-wide">{cards.map(([label, value, Icon]) => <article className="metric-card" key={label}><span><Icon/></span><p>{label}</p><strong>{value}</strong></article>)}</section>
     <section className="admin-overview-grid">
       <article><div className="section-heading"><div><h2>Operational health</h2><p>Queue pressure and recoverable failures.</p></div><ShieldCheck/></div><dl><div><dt>Pending jobs</dt><dd>{Number(metrics.pendingJobs || 0).toLocaleString()}</dd></div><div><dt>Failed or dead jobs</dt><dd className={metrics.failedJobs ? "red" : "green"}>{Number(metrics.failedJobs || 0).toLocaleString()}</dd></div><div><dt>Storage capacity</dt><dd>{formatBytes(metrics.storageQuotaBytes)}</dd></div></dl></article>
-      <article><div className="section-heading"><div><h2>Production configuration</h2><p>Sensitive values are never exposed here.</p></div><Database/></div><div className="configuration-grid">{configured.length ? configured.map(([key, value]) => <div key={key}><span>{key.replace(/([A-Z])/g, " $1")}</span>{value ? <CheckCircle2 className="green"/> : <XCircle className="red"/>}</div>) : <p className="table-empty">Configuration status is unavailable.</p>}</div></article>
+      <article><div className="section-heading"><div><h2>Production configuration</h2><p>Sensitive values are never exposed here.</p></div><Database/></div><div className="configuration-grid">{configured.length ? configured.map(([key, value]) => { const requirement = requirements[key]; return <div key={key} title={requirement?.missing?.length ? `Missing: ${requirement.missing.join(", ")}` : "Configured"}><span>{key.replace(/([A-Z])/g, " $1")}{requirement?.missing?.length ? <small>Missing: {requirement.missing.join(", ")}</small> : null}</span>{value && requirement?.ready !== false ? <CheckCircle2 className="green"/> : <XCircle className="red"/>}</div>; }) : <p className="table-empty">Configuration status is unavailable.</p>}</div></article>
     </section>
   </>;
 }
