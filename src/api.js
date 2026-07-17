@@ -35,6 +35,8 @@ function errorMessage(data, status) {
   if (data?.code === "CONFIGURATION_MISSING" && Array.isArray(data?.missing) && data.missing.some((name) => /RESEND_API_KEY|EMAIL_FROM/.test(name))) {
     return "Email signup is not configured on the backend. Add RESEND_API_KEY and EMAIL_FROM in Railway, then redeploy.";
   }
+  if (data?.code === "INVALID_OTP") return "That code is invalid or has expired.";
+  if (status === 429 && data?.retryAfter) return `Please wait ${Math.ceil(Number(data.retryAfter))} seconds before requesting another code.`;
   return data?.error?.message || data?.error || data?.message || data?.detail || `Request failed (${status})`;
 }
 
@@ -102,7 +104,7 @@ export const endpoints = {
     login: ({ email, password, remember }) => api("/api/auth/sign-in/email", { method: "POST", body: json({ email, password, rememberMe: remember !== false }), authRemember: remember !== false }),
     register: ({ username, email, password }) => api("/api/auth/sign-up/email", { method: "POST", body: json({ name: username, username, email, password, callbackURL: `${window.location.origin}${window.location.pathname}` }) }),
     verify: ({ email, code, otp }) => api("/api/auth/email-otp/verify-email", { method: "POST", body: json({ email, otp: otp || code }) }),
-    resend: ({ email }) => api("/api/auth/email-otp/send-verification-otp", { method: "POST", body: json({ email, type: "email-verification" }) }),
+    resend: ({ email }) => api("/api/auth/resend-pending-code", { method: "POST", body: json({ email }) }),
     forgot: ({ email }) => api("/api/auth/email-otp/request-password-reset", { method: "POST", body: json({ email }) }),
     reset: ({ email, code, otp, password }) => api("/api/auth/email-otp/reset-password", { method: "POST", body: json({ email, otp: otp || code, password }) }),
     logout: () => api("/api/auth/sign-out", { method: "POST", body: json({}) }),

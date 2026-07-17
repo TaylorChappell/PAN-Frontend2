@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, Sparkles, UserRound } from "lucide-react";
 import { endpoints } from "../api";
 import { useAuth } from "../auth";
 import { Button, Notice } from "../components/UI";
@@ -79,8 +79,8 @@ export function RegisterPage() {
     event.preventDefault(); if (!valid) return setError("Complete all fields and meet each password requirement.");
     setLoading(true); setError("");
     try {
-      await register({ username: values.username, email: values.email, password: values.password });
-      navigate("/verify-email", { state: { email: values.email } });
+      const result = await register({ username: values.username, email: values.email, password: values.password });
+      navigate("/verify-email", { state: { email: values.email.trim().toLowerCase(), warning: result?.emailDeliveryWarning || "" } });
     } catch (requestError) { setError(requestError.message); }
     finally { setLoading(false); }
   };
@@ -89,7 +89,7 @@ export function RegisterPage() {
   return <AuthLayout eyebrow="Create your workspace" title="From idea to live coin, without the busywork." copy="Your account gets dedicated payment and operational wallets, project history and secure credit accounting.">
     <form className="auth-form" onSubmit={submit}><div className="auth-form-heading"><h2>Create your PAN.AI account</h2><p>Your email must be verified before you can sign in.</p></div>
       {error ? <Notice>{error}</Notice> : null}<GoogleButton loading={googleLoading} onClick={google}/><div className="or"><span>or create with email</span></div>
-      <Field label="Username" autoComplete="username" required value={values.username} onChange={(e) => setValues({ ...values, username: e.target.value })} placeholder="panbuilder" />
+      <Field label="Username" icon={UserRound} autoComplete="username" required value={values.username} onChange={(e) => setValues({ ...values, username: e.target.value })} placeholder="panbuilder" />
       <Field label="Email address" icon={Mail} type="email" autoComplete="email" required value={values.email} onChange={(e) => setValues({ ...values, email: e.target.value })} placeholder="you@example.com" />
       <Field label="Password" icon={LockKeyhole} type="password" autoComplete="new-password" required value={values.password} onChange={(e) => setValues({ ...values, password: e.target.value })} placeholder="Create a secure password" />
       <div className="password-rules">{[["letters","At least 6 letters"],["number","At least 1 number"],["symbol","At least 1 symbol"]].map(([key,text]) => <span className={rules[key] ? "met" : ""} key={key}><Check />{text}</span>)}</div>
@@ -103,12 +103,32 @@ export function VerifyPage() {
   const location = useLocation(); const navigate = useNavigate();
   const [email, setEmail] = useState(location.state?.email || localStorage.getItem("pan_pending_email") || "");
   const [code, setCode] = useState(""); const [cooldown, setCooldown] = useState(60);
-  const [loading, setLoading] = useState(false); const [message, setMessage] = useState(""); const [error, setError] = useState("");
-  useEffect(() => { if (email) localStorage.setItem("pan_pending_email", email); }, [email]);
-  useEffect(() => { if (cooldown <= 0) return; const timer = setInterval(() => setCooldown((v) => v - 1), 1000); return () => clearInterval(timer); }, [cooldown]);
-  const verify = async (event) => { event.preventDefault(); setLoading(true); setError(""); try { await endpoints.auth.verify({ email, code }); localStorage.removeItem("pan_pending_email"); navigate("/login", { replace: true }); } catch (e) { setError(e.message); } finally { setLoading(false); } };
-  const resend = async () => { setError(""); try { await endpoints.auth.resend({ email }); setMessage("A new code was sent."); setCooldown(60); } catch (e) { setError(e.message); } };
-  return <AuthLayout eyebrow="Verify your email" title="One quick security check." copy="Enter the six-digit code we sent to activate your PAN account and its wallets."><form className="auth-form verify-form" onSubmit={verify}><div className="mail-orb"><Mail /></div><div className="auth-form-heading"><h2>Check your inbox</h2><p>We sent a code to <strong>{email || "your email"}</strong>.</p></div>{error ? <Notice>{error}</Notice> : null}{message ? <Notice type="success">{message}</Notice> : null}<label className="code-field"><span>Verification code</span><input inputMode="numeric" pattern="[0-9]{6}" maxLength="6" autoFocus value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="000000" /></label><Button loading={loading} disabled={code.length !== 6}>Verify account</Button><div className="tiny-actions"><button type="button" disabled={cooldown > 0 || !email} onClick={resend}>{cooldown > 0 ? `Resend in ${cooldown}s` : "Send code again"}</button><button type="button" onClick={() => { setEmail(""); setMessage(""); }}>Change email</button></div>{!email ? <Field label="Email address" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /> : null}</form></AuthLayout>;
+  const [loading, setLoading] = useState(false); const [resending, setResending] = useState(false);
+  const [error, setError] = useState(location.state?.warning || "");
+  useEffect(() => { if (email) localStorage.setItem("pan_pending_email", email.trim().toLowerCase()); }, [email]);
+  useEffect(() => { if (cooldown <= 0) return; const timer = setInterval(() => setCooldown((value) => Math.max(0, value - 1)), 1000); return () => clearInterval(timer); }, [cooldown]);
+  const verify = async (event) => {
+    event.preventDefault(); setLoading(true); setError("");
+    try {
+      await endpoints.auth.verify({ email: email.trim().toLowerCase(), code });
+      localStorage.removeItem("pan_pending_email");
+      navigate("/login", { replace: true });
+    } catch (requestError) {
+      setError(requestError.data?.code === "INVALID_OTP" ? "That code is invalid or has expired. Use the latest PAN code in your inbox, or send the code again." : requestError.message);
+    } finally { setLoading(false); }
+  };
+  const resend = async () => {
+    setError(""); setResending(true);
+    try {
+      const result = await endpoints.auth.resend({ email: email.trim().toLowerCase() });
+      setCooldown(Math.max(1, Number(result?.retryAfter) || 60));
+    } catch (requestError) {
+      const retryAfter = Number(requestError.data?.retryAfter);
+      if (Number.isFinite(retryAfter) && retryAfter > 0) setCooldown(Math.ceil(retryAfter));
+      setError(requestError.message);
+    } finally { setResending(false); }
+  };
+  return <AuthLayout eyebrow="Verify your email" title="One quick security check." copy="Enter the six-digit code we sent to activate your PAN account and its wallets."><form className="auth-form verify-form" onSubmit={verify}><div className="mail-orb"><Mail /></div><div className="auth-form-heading"><h2>Check your inbox</h2><p>We sent a code to <strong>{email || "your email"}</strong>.</p></div>{error ? <Notice>{error}</Notice> : null}<label className="code-field"><span>Verification code</span><input inputMode="numeric" pattern="[0-9]{6}" maxLength="6" autoFocus value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="000000" /></label><Button loading={loading} disabled={code.length !== 6}>Verify account</Button><div className="tiny-actions"><button type="button" disabled={resending || cooldown > 0 || !email} onClick={resend}>{resending ? "Sending…" : cooldown > 0 ? `Resend in ${cooldown}s` : "Send code again"}</button><button type="button" onClick={() => { setEmail(""); setError(""); setCooldown(0); }}>Change email</button></div>{!email ? <Field label="Email address" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /> : null}</form></AuthLayout>;
 }
 
 export function ForgotPage() {
