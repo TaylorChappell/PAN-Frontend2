@@ -1,0 +1,288 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  ArrowRight,
+  Bot,
+  BrainCircuit,
+  Check,
+  ChevronRight,
+  CircleDollarSign,
+  Coins,
+  ExternalLink,
+  FileText,
+  Globe2,
+  Image,
+  Layers3,
+  LineChart,
+  Menu,
+  MessageSquareText,
+  Network,
+  Rocket,
+  ShieldCheck,
+  Sparkles,
+  WandSparkles,
+  X as CloseIcon,
+  Zap,
+} from "lucide-react";
+
+const capabilities = [
+  "Shape the coin idea",
+  "Create the identity",
+  "Generate launch assets",
+  "Build the website",
+  "Prepare the Pons launch",
+  "Monitor the live project",
+];
+
+const featureCards = [
+  {
+    icon: BrainCircuit,
+    eyebrow: "CHAIN-NATIVE INTELLIGENCE",
+    title: "An AI built around Robinhood Chain",
+    copy: "PAN focuses on the ecosystem you are actually launching into, helping with the coin, positioning, creative direction and launch decisions from one conversation.",
+  },
+  {
+    icon: Layers3,
+    eyebrow: "ONE WORKSPACE",
+    title: "The entire project stays connected",
+    copy: "Your brief, coin details, imagery, website, launch preparation and live status all remain together instead of being scattered across unrelated tools.",
+  },
+  {
+    icon: WandSparkles,
+    eyebrow: "IDEA TO EXECUTION",
+    title: "Build without wrestling with every step",
+    copy: "Explain what you want in plain English. PAN turns the idea into something structured, polished and ready to move toward market.",
+  },
+  {
+    icon: Zap,
+    eyebrow: "ALWAYS IMPROVING",
+    title: "A product designed to get smarter",
+    copy: "PAN will keep expanding with stronger intelligence, more creative tools and deeper support for projects across Robinhood Chain.",
+  },
+];
+
+const roadmap = [
+  ["NOW", "Launch workspace", "AI project planning, coin creation, visual generation, website building and Pons launch support."],
+  ["NEXT", "Smarter market intelligence", "Deeper Robinhood Chain awareness, stronger project guidance and more useful live-market context."],
+  ["EXPANDING", "More creation tools", "Broader branding, content and growth capabilities that continue after the coin goes live."],
+  ["FUTURE", "Persistent project operator", "PAN becomes an increasingly capable agent for building, running and growing on-chain projects."],
+];
+
+function scrollToSection(id) {
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function Reveal({ className = "", children }) {
+  return <div className={`home-reveal ${className}`}>{children}</div>;
+}
+
+function SectionHeading({ eyebrow, title, copy, align = "left" }) {
+  return <div className={`home-section-heading ${align === "center" ? "center" : ""}`}>
+    <span>{eyebrow}</span>
+    <h2>{title}</h2>
+    {copy ? <p>{copy}</p> : null}
+  </div>;
+}
+
+function SocialLinks({ compact = false }) {
+  const xUrl = import.meta.env.VITE_X_URL || "https://x.com/PanAIApp";
+  const telegramUrl = import.meta.env.VITE_TELEGRAM_URL;
+  const discordUrl = import.meta.env.VITE_DISCORD_URL;
+  return <div className={`home-socials ${compact ? "compact" : ""}`}>
+    <a href={xUrl} target="_blank" rel="noreferrer"><img src={`${import.meta.env.BASE_URL}X.png`} alt="" />PanAiApp<ExternalLink /></a>
+    {telegramUrl ? <a href={telegramUrl} target="_blank" rel="noreferrer">Telegram<ExternalLink /></a> : null}
+    {discordUrl ? <a href={discordUrl} target="_blank" rel="noreferrer">Discord<ExternalLink /></a> : null}
+  </div>;
+}
+
+function HeroVisual() {
+  return <div className="home-hero-visual" aria-label="PAN project workspace preview">
+    <div className="hero-glow hero-glow-one" />
+    <div className="hero-glow hero-glow-two" />
+    <div className="hero-workspace-card">
+      <div className="hero-window-bar">
+        <span><i /><i /><i /></span>
+        <small>PAN PROJECT WORKSPACE</small>
+        <em>LIVE</em>
+      </div>
+      <div className="hero-workspace-body">
+        <aside>
+          <div className="hero-mini-brand"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><b>PAN.AI</b></div>
+          <span className="hero-side-button"><i>+</i>New project</span>
+          <small>PROJECTS</small>
+          <div className="hero-project active"><span>N</span><div><b>Neon Runner</b><small>Building</small></div></div>
+          <div className="hero-project"><span>P</span><div><b>Project Paws</b><small>Draft</small></div></div>
+          <div className="hero-side-lines"><i /><i /><i /></div>
+        </aside>
+        <section>
+          <header><div><small>PAN · PROJECT AGENT</small><b>Build a coin people remember.</b></div><span><i />Robinhood Chain</span></header>
+          <div className="hero-chat">
+            <div className="hero-message user"><p>Build a fast, bold community coin inspired by night racing.</p></div>
+            <div className="hero-message agent"><span><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>PAN</small><p>I have shaped the concept, identity and launch direction. Here is the project I would take forward.</p><div className="hero-result-tags"><em><Check />Identity</em><em><Check />Launch plan</em><em><Check />Website</em></div></div></div>
+          </div>
+          <div className="hero-compose"><MessageSquareText /><span>Ask PAN to build, change or launch anything…</span><button><ArrowRight /></button></div>
+        </section>
+        <aside className="hero-details">
+          <header><small>COIN DETAILS</small><em>Ready</em></header>
+          <div className="hero-coin-image"><div><Image /><span>NR</span></div></div>
+          <label><small>NAME</small><span>Neon Runner</span></label>
+          <label><small>TICKER</small><span>NRUN</span></label>
+          <label><small>LAUNCHPAD</small><span className="pons-value"><Rocket />Pons</span></label>
+          <div className="hero-launch-state"><span><i /></span><div><small>STATUS</small><b>Ready to launch</b></div></div>
+        </aside>
+      </div>
+    </div>
+    <div className="hero-floating-card hero-floating-live"><span><LineChart /></span><div><small>PROJECT STATUS</small><b>Live on Robinhood Chain</b></div><Check /></div>
+    <div className="hero-floating-card hero-floating-pons"><span><Rocket /></span><div><small>CHOSEN LAUNCHPAD</small><b>Pons</b></div></div>
+  </div>;
+}
+
+export function HomePage() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const ponsUrl = import.meta.env.VITE_PONS_TOKEN_URL || "https://pons.family";
+  const whitepaperUrl = import.meta.env.VITE_WHITEPAPER_URL;
+
+  useEffect(() => {
+    const items = [...document.querySelectorAll(".home-reveal")];
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    items.forEach((item) => observer.observe(item));
+    return () => observer.disconnect();
+  }, []);
+
+  const navigateSection = (id) => {
+    setMenuOpen(false);
+    scrollToSection(id);
+  };
+
+  return <main className="home-page">
+    <div className="home-noise" />
+    <header className="home-nav">
+      <Link className="home-brand" to="/" aria-label="PAN.AI home"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><span>PAN.AI</span></Link>
+      <nav className={menuOpen ? "open" : ""}>
+        <button onClick={() => navigateSection("product")}>Product</button>
+        <button onClick={() => navigateSection("why-pan")}>Why PAN</button>
+        <button onClick={() => navigateSection("tokenomics")}>Tokenomics</button>
+        <button onClick={() => navigateSection("roadmap")}>Roadmap</button>
+        <button onClick={() => navigateSection("whitepaper")}>Whitepaper</button>
+      </nav>
+      <div className="home-nav-actions">
+        <Link className="home-sign-in" to="/login">Sign in</Link>
+        <Link className="home-nav-cta" to="/register">Sign up<ArrowRight /></Link>
+      </div>
+      <button className="home-menu-button" onClick={() => setMenuOpen((value) => !value)} aria-label="Toggle navigation">{menuOpen ? <CloseIcon /> : <Menu />}</button>
+    </header>
+
+    <section className="home-hero" id="product">
+      <div className="home-hero-copy">
+        <div className="home-kicker"><span><Sparkles /></span>THE ROBINHOOD CHAIN PROJECT AGENT</div>
+        <h1>Build the next coin <em>people remember.</em></h1>
+        <p>PAN is a Robinhood Chain-specific AI that helps turn an idea into a complete coin project—from the concept and visuals to the website, Pons launch and live project workspace.</p>
+        <div className="home-hero-actions">
+          <Link className="home-primary-cta" to="/register">Start building<ArrowRight /></Link>
+          <button className="home-secondary-cta" onClick={() => scrollToSection("how-it-works")}><span><Bot /></span>See how PAN works</button>
+        </div>
+        <div className="home-hero-meta">
+          <div><span><ShieldCheck /></span><p><b>Robinhood-native</b><small>Focused on one ecosystem</small></p></div>
+          <div><span><Rocket /></span><p><b>Launching with Pons</b><small>Chosen launchpad</small></p></div>
+          <div><span><Zap /></span><p><b>Built to expand</b><small>Smarter every day</small></p></div>
+        </div>
+        <div className="home-hero-community"><span>FOLLOW THE BUILD</span><SocialLinks /></div>
+      </div>
+      <HeroVisual />
+    </section>
+
+    <section className="home-capability-strip" aria-label="PAN capabilities">
+      <div>{[...capabilities, ...capabilities].map((item, index) => <span key={`${item}-${index}`}><i />{item}</span>)}</div>
+    </section>
+
+    <section className="home-section home-intro" id="why-pan">
+      <Reveal><SectionHeading eyebrow="BUILT FOR A BETTER LAUNCH" title="One focused AI for the whole project." copy="Most coin launches are fragmented across research, design, websites, wallets and launch tools. PAN brings the important parts into one clear workflow built around Robinhood Chain." align="center" /></Reveal>
+      <div className="home-feature-grid">
+        {featureCards.map(({ icon: Icon, eyebrow, title, copy }, index) => <Reveal className={`home-feature-card delay-${index + 1}`} key={title}><article><span className="home-feature-icon"><Icon /></span><small>{eyebrow}</small><h3>{title}</h3><p>{copy}</p><i className="home-card-line" /></article></Reveal>)}
+      </div>
+    </section>
+
+    <section className="home-section home-workflow" id="how-it-works">
+      <Reveal className="home-workflow-copy"><SectionHeading eyebrow="HOW IT WORKS" title="Go from a rough idea to a real project." copy="You do not need to arrive with every detail worked out. Start with the idea and PAN helps shape the rest." />
+        <div className="home-workflow-list">
+          <article><span>01</span><div><h3>Describe what you want to build</h3><p>Give PAN the concept, style, audience or even just the feeling you want the coin to have.</p></div></article>
+          <article><span>02</span><div><h3>Build the project in one workspace</h3><p>Develop the identity, coin details, visual assets and website while PAN keeps everything aligned.</p></div></article>
+          <article><span>03</span><div><h3>Launch through Pons</h3><p>Prepare the project for Robinhood Chain and move from draft to a live coin using PAN’s chosen launchpad.</p></div></article>
+        </div>
+        <Link className="home-inline-link" to="/register">Create your first project<ArrowRight /></Link>
+      </Reveal>
+      <Reveal className="home-workflow-graphic delay-2">
+        <div className="workflow-orbit">
+          <div className="workflow-core"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><span>PAN</span></div>
+          <div className="workflow-ring ring-one" />
+          <div className="workflow-ring ring-two" />
+          <span className="workflow-node node-one"><MessageSquareText /><b>Idea</b></span>
+          <span className="workflow-node node-two"><Image /><b>Brand</b></span>
+          <span className="workflow-node node-three"><Globe2 /><b>Website</b></span>
+          <span className="workflow-node node-four"><Rocket /><b>Pons</b></span>
+          <span className="workflow-node node-five"><LineChart /><b>Live</b></span>
+        </div>
+      </Reveal>
+    </section>
+
+    <section className="home-section home-pons-section">
+      <Reveal className="home-pons-card">
+        <div className="home-pons-copy"><span className="home-pons-icon"><Rocket /></span><div><small>CHOSEN LAUNCHPAD</small><h2>PAN launches with Pons.</h2><p>Pons is the launchpad PAN is being built around for Robinhood Chain. The goal is a cleaner path from the project workspace to a live coin, without making users stitch the process together themselves.</p><a href={ponsUrl} target="_blank" rel="noreferrer">Explore $PAN on Pons<ExternalLink /></a></div></div>
+        <div className="home-chain-graphic"><span className="chain-point point-a" /><span className="chain-point point-b" /><span className="chain-point point-c" /><span className="chain-point point-d" /><i className="chain-line line-a" /><i className="chain-line line-b" /><i className="chain-line line-c" /><div><Network /><b>Robinhood Chain</b><small>Built for the ecosystem</small></div><em><Rocket /><b>Pons</b><small>Launchpad</small></em></div>
+      </Reveal>
+    </section>
+
+    <section className="home-section home-tokenomics" id="tokenomics">
+      <Reveal><SectionHeading eyebrow="$PAN TOKENOMICS" title="Utility that grows with the product." copy="$PAN is designed around access, usage and participation in the PAN ecosystem—not empty complexity. Exact contract and allocation details can be published transparently through the whitepaper and Pons listing." align="center" /></Reveal>
+      <div className="home-token-layout">
+        <Reveal className="home-token-visual">
+          <div className="token-orb"><div><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><b>$PAN</b><small>ECOSYSTEM TOKEN</small></div><i className="token-ring token-ring-one" /><i className="token-ring token-ring-two" /></div>
+          <span className="token-flow token-flow-one">AI usage<i /></span>
+          <span className="token-flow token-flow-two">Community<i /></span>
+          <span className="token-flow token-flow-three">Expansion<i /></span>
+        </Reveal>
+        <div className="home-token-cards">
+          <Reveal className="delay-1"><article><span><CircleDollarSign /></span><div><small>CORE UTILITY</small><h3>Credits used for AI</h3><p>$PAN can be used to fund PAN credits, connecting the token directly to usage of the product.</p></div></article></Reveal>
+          <Reveal className="delay-2"><article><span><Coins /></span><div><small>COMMUNITY</small><h3>Rewards participation</h3><p>Community campaigns can reward useful attention, content and participation with $PAN, credits or both.</p></div></article></Reveal>
+          <Reveal className="delay-3"><article><span><Rocket /></span><div><small>LONG-TERM UTILITY</small><h3>More value as PAN expands</h3><p>As new capabilities are added, the token can support a wider set of creation, launch and project-management functions.</p></div></article></Reveal>
+          <Reveal className="delay-4"><article><span><ShieldCheck /></span><div><small>TRANSPARENCY</small><h3>Verify the live details</h3><p>Contract, market and allocation information should be checked against the official Pons listing and whitepaper.</p></div></article></Reveal>
+        </div>
+      </div>
+    </section>
+
+    <section className="home-section home-roadmap" id="roadmap">
+      <Reveal><SectionHeading eyebrow="THE DIRECTION" title="PAN is only getting started." copy="The product will continue to expand around a simple goal: make it dramatically easier to create and operate a strong Robinhood Chain project." /></Reveal>
+      <div className="home-roadmap-list">
+        {roadmap.map(([phase, title, copy], index) => <Reveal className={`delay-${index + 1}`} key={phase}><article><span>{String(index + 1).padStart(2, "0")}</span><div><small>{phase}</small><h3>{title}</h3><p>{copy}</p></div>{index === 0 ? <em><i />Active</em> : <ChevronRight />}</article></Reveal>)}
+      </div>
+    </section>
+
+    <section className="home-section home-whitepaper" id="whitepaper">
+      <Reveal className="home-whitepaper-card">
+        <div className="whitepaper-document"><span><FileText /></span><div><small>PAN.AI</small><b>WHITEPAPER</b><i /><i /><i /><em>Project Agent Network</em></div></div>
+        <div className="whitepaper-copy"><span>READ THE VISION</span><h2>The product, token and path forward.</h2><p>The PAN whitepaper is the source for the complete vision: why PAN exists, how $PAN fits into the platform, the chosen Pons launch model and how the ecosystem is intended to grow.</p>
+          {whitepaperUrl ? <a className="home-primary-cta" href={whitepaperUrl} target="_blank" rel="noreferrer">Read the whitepaper<FileText /></a> : <button className="home-primary-cta" onClick={() => scrollToSection("tokenomics")}>Explore the token model<ArrowRight /></button>}
+        </div>
+      </Reveal>
+    </section>
+
+    <section className="home-final-cta">
+      <div className="final-cta-glow" />
+      <Reveal><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><span>PROJECT AGENT NETWORK</span><h2>Your next Robinhood Chain project starts with a conversation.</h2><p>Bring the idea. PAN helps turn it into something people can see, understand and remember.</p><div><Link className="home-primary-cta" to="/register">Start building with PAN<ArrowRight /></Link><Link className="home-secondary-cta" to="/login">Sign in</Link></div></Reveal>
+    </section>
+
+    <footer className="home-footer">
+      <div><Link className="home-brand" to="/"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><span>PAN.AI</span></Link><p>The Robinhood Chain project agent.</p></div>
+      <div className="home-footer-links"><button onClick={() => scrollToSection("why-pan")}>Why PAN</button><button onClick={() => scrollToSection("tokenomics")}>Tokenomics</button><button onClick={() => scrollToSection("roadmap")}>Roadmap</button><button onClick={() => scrollToSection("whitepaper")}>Whitepaper</button></div>
+      <SocialLinks compact />
+      <small>© {new Date().getFullYear()} PAN.AI. Built for Robinhood Chain.</small>
+    </footer>
+  </main>;
+}
