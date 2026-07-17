@@ -1,5 +1,10 @@
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://pan-backend-production-8d86.up.railway.app").replace(/\/$/, "");
 
+export function mediaUrl(value) {
+  if (!value || value.startsWith("data:") || value.startsWith("blob:") || /^https?:\/\//i.test(value)) return value || "";
+  return `${API_BASE}${value.startsWith("/") ? value : `/${value}`}`;
+}
+
 const TOKEN_KEY = "pan_access_token";
 
 export class ApiError extends Error {
@@ -64,6 +69,21 @@ export async function api(path, options = {}) {
 
 const json = (value) => JSON.stringify(value);
 
+const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
+async function waitForAiRun(run) {
+  const id = run?.id || run?.runId;
+  if (!id) throw new ApiError("PAN did not return an AI run id.");
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const result = await api(`/api/ai/runs/${encodeURIComponent(id)}`);
+    const status = result?.run?.status || result?.status;
+    if (status === "succeeded") return result;
+    if (status === "failed" || status === "cancelled") throw new ApiError(result?.run?.errorMessage || result?.error || `AI run ${status}.`);
+    await wait(1_500);
+  }
+  throw new ApiError("PAN is still working. Refresh the project shortly to see the result.", 202);
+}
+
 export const endpoints = {
   health: () => api("/api/health"),
   auth: {
@@ -87,36 +107,57 @@ export const endpoints = {
     create: (payload) => api("/api/projects", { method: "POST", body: json(payload) }),
     update: (id, payload) => api(`/api/projects/${encodeURIComponent(id)}`, { method: "PATCH", body: json(payload) }),
     remove: (id) => api(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" }),
-    message: (id, payload) => api(`/api/projects/${encodeURIComponent(id)}/messages`, { method: "POST", body: json(payload) }),
-    launch: (id, payload) => api(`/api/projects/${encodeURIComponent(id)}/launch`, { method: "POST", body: json(payload) }),
+    message: async (id, payload) => {
+      const created = await api(`/api/projects/${encodeURIComponent(id)}/chat`, { method: "POST", body: json({ prompt: payload.message, performance: payload.performance, attachments: payload.attachments, idempotencyKey: crypto.randomUUID() }) });
+      return waitForAiRun(created?.run || created);
+    },
+    launch: (id, payload) => api(`/api/projects/${encodeURIComponent(id)}/launch`, { method: "POST", body: json({ walletMode: payload.walletMode === "connected" ? "external" : "managed", devBuyEth: String(payload.devBuyEth || 0), idempotencyKey: crypto.randomUUID() }) }),
     claimFees: (id) => api(`/api/projects/${encodeURIComponent(id)}/creator-fees/claim`, { method: "POST" }),
   },
   images: {
-    generate: (payload) => api("/api/image-generations", { method: "POST", body: json(payload) }),
+    generate: async (payload) => {
+      const created = await api(`/api/projects/${encodeURIComponent(payload.projectId)}/images`, { method: "POST", body: json({ prompt: payload.prompt, performance: payload.performance, kind: payload.purpose === "coin_logo" ? "logo" : "image", idempotencyKey: crypto.randomUUID() }) });
+      return waitForAiRun(created?.run || created);
+    },
+  },
+  assets: {
+    upload: (file, { projectId, kind = "attachment", visibility = "private" } = {}) => {
+      const body = new FormData();
+      body.set("file", file); body.set("kind", kind); body.set("visibility", visibility);
+      if (projectId) body.set("projectId", projectId);
+      return api("/api/assets", { method: "POST", body });
+    },
   },
   credits: {
     summary: () => api("/api/credits"),
-    purchase: (payload) => api("/api/credit-purchase-intents", { method: "POST", body: json(payload) }),
+    purchase: (payload) => api("/api/credits/intents", { method: "POST", body: json({ paymentAsset: payload.asset === "ETH" ? "eth" : "pan", amount: String(payload.amount), idempotencyKey: crypto.randomUUID() }) }),
     history: () => api("/api/credits/transactions"),
   },
   wallets: {
     list: () => api("/api/wallets"),
     provision: () => api("/api/wallets/provision", { method: "POST" }),
-    withdraw: (payload) => api("/api/wallets/withdrawals", { method: "POST", body: json(payload) }),
-    connectChallenge: (payload) => api("/api/wallet-connections/challenge", { method: "POST", body: json(payload) }),
-    connectVerify: (payload) => api("/api/wallet-connections/verify", { method: "POST", body: json(payload) }),
+    withdraw: (payload) => api("/api/wallets/withdrawals", { method: "POST", body: json({ destination: payload.address, amountEth: String(payload.amountEth), idempotencyKey: crypto.randomUUID(), confirmed: true }) }),
+    connectChallenge: async (payload) => (await api("/api/wallets/external/challenge", { method: "POST", body: json(payload) }))?.challenge,
+    connectVerify: (payload) => api("/api/wallets/external/verify", { method: "POST", body: json(payload) }),
+    confirmSigningRequest: (requestId, transactionHash) => api("/api/wallets/external/signing-requests", { method: "POST", body: json({ requestId, transactionHash }) }),
   },
   sites: {
-    list: () => api("/api/sites"),
-    create: (payload) => api("/api/sites", { method: "POST", body: json(payload) }),
-    get: (id) => api(`/api/sites/${encodeURIComponent(id)}`),
-    run: (id, payload) => api(`/api/sites/${encodeURIComponent(id)}/runs`, { method: "POST", body: json(payload) }),
-    env: (id) => api(`/api/sites/${encodeURIComponent(id)}/environment-variables`),
-    setEnv: (id, payload) => api(`/api/sites/${encodeURIComponent(id)}/environment-variables`, { method: "PUT", body: json(payload) }),
-    githubStatus: () => api("/api/github/status"),
+    get: (projectId, versionId) => api(`/api/projects/${encodeURIComponent(projectId)}/website${versionId ? `?versionId=${encodeURIComponent(versionId)}` : ""}`),
+    run: async (projectId, payload) => {
+      if (payload.operation === "save_files") return api(`/api/projects/${encodeURIComponent(projectId)}/website`, { method: "PATCH", body: json({ files: payload.files, basedOnVersionId: payload.basedOnVersionId, runtime: payload.runtime }) });
+      const created = await api(`/api/projects/${encodeURIComponent(projectId)}/website`, { method: "POST", body: json({ prompt: payload.prompt, performance: payload.performance || "medium", basedOnVersionId: payload.basedOnVersionId, runtime: payload.runtime === "fullstack" ? "railway_node" : payload.runtime || "static", idempotencyKey: crypto.randomUUID() }) });
+      await waitForAiRun(created?.run || created);
+      return api(`/api/projects/${encodeURIComponent(projectId)}/website?versionId=${encodeURIComponent(created?.version?.id || "")}`);
+    },
+    env: (projectId) => api(`/api/projects/${encodeURIComponent(projectId)}/environment`),
+    setEnv: async (projectId, payload) => Promise.all(payload.variables.map((variable) => api(`/api/projects/${encodeURIComponent(projectId)}/environment`, { method: "POST", body: json(variable) }))),
+    githubStatus: async () => {
+      const result = await api("/api/github/connection");
+      return { ...result, connected: Boolean(result?.connection), username: result?.connection?.login, login: result?.connection?.login };
+    },
     githubConnectUrl: `${API_BASE}/api/github/connect`,
-    exportGithub: (id, payload) => api(`/api/sites/${encodeURIComponent(id)}/github-exports`, { method: "POST", body: json(payload) }),
-    downloadUrl: (id) => `${API_BASE}/api/sites/${encodeURIComponent(id)}/download`,
+    exportGithub: (projectId, payload) => api(`/api/projects/${encodeURIComponent(projectId)}/deployments`, { method: "POST", body: json(payload) }),
+    assetUrl: (path) => path?.startsWith("http") ? path : `${API_BASE}${path || ""}`,
   },
   support: {
     list: () => api("/api/support/tickets"),
@@ -127,9 +168,14 @@ export const endpoints = {
   admin: {
     overview: () => api("/api/admin/overview"),
     users: (query = "") => api(`/api/admin/users${query ? `?q=${encodeURIComponent(query)}` : ""}`),
-    grant: (userId, amount, reason) => api(`/api/admin/users/${encodeURIComponent(userId)}/credits`, { method: "POST", body: json({ amount, reason }) }),
-    tickets: () => api("/api/admin/support/tickets"),
+    grant: (userId, amount, reason) => api("/api/admin/users", { method: "POST", body: json({ userId, delta: amount, reason, idempotencyKey: crypto.randomUUID() }) }),
+    tickets: () => api("/api/admin/support"),
+    replyTicket: (id, message) => api(`/api/admin/support/${encodeURIComponent(id)}/messages`, { method: "POST", body: json({ message }) }),
+    closeTicket: (id, adminNote = "") => api("/api/admin/support", { method: "PATCH", body: json({ id, action: "close", adminNote }) }),
+    projects: () => api("/api/admin/projects"),
     operations: () => api("/api/admin/operations"),
+    operationAction: (action, targetId) => api("/api/admin/operations", { method: "PATCH", body: json({ action, targetId }) }),
+    audit: () => api("/api/admin/audit"),
   },
 };
 

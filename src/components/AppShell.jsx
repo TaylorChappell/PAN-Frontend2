@@ -10,13 +10,14 @@ function projectArray(data) {
 }
 
 function balanceFrom(data, user) {
-  return Number(data?.creditBalance ?? data?.credits ?? data?.balance ?? user?.creditBalance ?? user?.credits ?? 0);
+  return Number(data?.creditBalance ?? data?.credits?.balance ?? data?.credits ?? data?.balance ?? user?.creditBalance ?? user?.credits ?? 0);
 }
 
 export function AppShell() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const studioMode = /^\/projects\/[^/]+\/website(?:\/|$)/.test(location.pathname);
   const [projects, setProjects] = useState([]);
   const [account, setAccount] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -52,7 +53,8 @@ export function AppShell() {
   };
 
   const creditBalance = balanceFrom(account, user);
-  const ethBalance = account?.ethBalance ?? account?.wallet?.ethBalance ?? user?.ethBalance ?? 0;
+  const operationsWallet = account?.wallets?.find((wallet) => wallet.role === "operations");
+  const ethBalance = operationsWallet?.ethBalance ?? account?.ethBalance ?? account?.wallet?.ethBalance ?? user?.ethBalance ?? 0;
   const banner = useMemo(() => {
     if (bannerClosed || creditBalance > 20) return null;
     return creditBalance <= 0
@@ -61,7 +63,7 @@ export function AppShell() {
   }, [bannerClosed, creditBalance]);
 
   const name = user?.name || user?.username || user?.email || "PAN user";
-  const avatar = user?.avatarUrl || user?.picture;
+  const avatar = user?.image || user?.avatarUrl || user?.picture;
 
   const openProjectAction = (action, project) => {
     setProjectMenu(null);
@@ -90,12 +92,12 @@ export function AppShell() {
   };
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${studioMode ? "studio-mode" : ""}`}>
       <button className="mobile-menu" onClick={() => setSidebarOpen(true)} aria-label="Open menu"><Menu /></button>
       {sidebarOpen ? <button className="mobile-overlay" onClick={() => setSidebarOpen(false)} aria-label="Close menu" /> : null}
       <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="sidebar-top">
-          <div className="brand-row"><Link to="/" className="brand"><i />PAN</Link><button className="mobile-close" onClick={() => setSidebarOpen(false)}><X /></button></div>
+          <div className="brand-row"><Link to="/" className="brand"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" />PAN.AI</Link><button className="mobile-close" onClick={() => setSidebarOpen(false)}><X /></button></div>
           <Button className="new-project" onClick={createProject} loading={creating}><Plus size={18} />New project</Button>
           {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
           <p className="side-label">PROJECTS</p>
@@ -118,11 +120,11 @@ export function AppShell() {
             <NavLink to="/credits"><Coins />Credits & wallet</NavLink>
             <NavLink to="/settings"><Settings />Settings</NavLink>
             <NavLink to="/support"><LifeBuoy />Support</NavLink>
-            {(user?.isAdmin || user?.role === "admin") ? <NavLink to="/admin"><ShieldCheck />Admin</NavLink> : null}
+            {(account?.isAdmin || user?.isAdmin || user?.role === "admin") ? <NavLink to="/admin"><ShieldCheck />Admin</NavLink> : null}
           </nav>
           <Link to="/credits" className="account-card">
             {avatar ? <img src={avatar} alt="" referrerPolicy="no-referrer" /> : <span className="avatar">{name.slice(0, 1).toUpperCase()}</span>}
-            <span><strong>{creditBalance.toLocaleString()} credits</strong><small>{Number(ethBalance).toFixed(4)} ETH · {shortAddress(account?.walletAddress || user?.walletAddress)}</small></span>
+            <span><strong>{creditBalance.toLocaleString()} credits</strong><small>{Number(ethBalance).toFixed(4)} ETH · {shortAddress(operationsWallet?.address || account?.walletAddress || user?.walletAddress)}</small></span>
           </Link>
         </div>
       </aside>
