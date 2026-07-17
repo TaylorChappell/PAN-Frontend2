@@ -103,7 +103,12 @@ export const endpoints = {
     me: () => api("/api/auth/get-session"),
     login: ({ email, password, remember }) => api("/api/auth/sign-in/email", { method: "POST", body: json({ email, password, rememberMe: remember !== false }), authRemember: remember !== false }),
     register: ({ username, email, password }) => api("/api/auth/sign-up/email", { method: "POST", body: json({ name: username, username, email, password, callbackURL: `${window.location.origin}${window.location.pathname}` }) }),
-    verify: ({ email, code, otp }) => api("/api/auth/email-otp/verify-email", { method: "POST", body: json({ email, otp: otp || code }) }),
+    verify: async ({ email, code, otp }) => {
+      const data = await api("/api/auth/email-otp/verify-email", { method: "POST", body: json({ email, otp: otp || code }) });
+      const token = unwrapToken(data);
+      if (token) setToken(token, true);
+      return data;
+    },
     resend: ({ email }) => api("/api/auth/resend-pending-code", { method: "POST", body: json({ email }) }),
     forgot: ({ email }) => api("/api/auth/email-otp/request-password-reset", { method: "POST", body: json({ email }) }),
     reset: ({ email, code, otp, password }) => api("/api/auth/email-otp/reset-password", { method: "POST", body: json({ email, otp: otp || code, password }) }),

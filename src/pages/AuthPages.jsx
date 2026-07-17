@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, Sparkles, UserRound } from "lucide-react";
-import { endpoints } from "../api";
+import { endpoints, unwrapUser } from "../api";
 import { useAuth } from "../auth";
 import { Button, Notice } from "../components/UI";
 
@@ -25,7 +25,13 @@ function Field({ label, icon: Icon, type = "text", ...props }) {
 }
 
 function GoogleButton({ onClick, loading = false }) {
-  return <button type="button" className="google-button" disabled={loading} onClick={onClick}>{loading ? <LoaderCircle className="spin" size={18} /> : <span>G</span>}Continue with Google</button>;
+  return <button type="button" className="google-button" disabled={loading} onClick={onClick}>{loading ? <LoaderCircle className="spin" size={18} /> : <img src={`${import.meta.env.BASE_URL}google.png`} alt="" />}Continue with Google</button>;
+}
+
+function AuthSocialActions() {
+  const xUrl = import.meta.env.VITE_X_URL || "https://x.com/PanAIApp";
+  const ponsUrl = import.meta.env.VITE_PONS_TOKEN_URL || "https://pons.family";
+  return <><a className="auth-social-button auth-social-pan" href={ponsUrl} target="_blank" rel="noreferrer"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" />GET $PAN</a><a className="auth-social-button auth-social-x" href={xUrl} target="_blank" rel="noreferrer"><img src={`${import.meta.env.BASE_URL}X.png`} alt="" />X</a></>;
 }
 
 export function LoginPage() {
@@ -44,10 +50,7 @@ export function LoginPage() {
   };
   const google = async () => { setGoogleLoading(true); setError(""); try { const data = await endpoints.auth.google(); if (!data?.url) throw new Error("Google sign-in did not return an authorization URL."); window.location.assign(data.url); } catch (requestError) { setError(requestError.message); setGoogleLoading(false); } };
 
-  const xUrl = import.meta.env.VITE_X_URL || "https://x.com/PanAIApp";
-  const ponsUrl = import.meta.env.VITE_PONS_TOKEN_URL || "https://pons.family";
-  const socialActions = <><a className="auth-social-button auth-social-x" href={xUrl} target="_blank" rel="noreferrer"><img src={`${import.meta.env.BASE_URL}X.png`} alt="" />X</a><a className="auth-social-button auth-social-pan" href={ponsUrl} target="_blank" rel="noreferrer"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" />GET $PAN</a></>;
-  return <AuthLayout eyebrow="Welcome back" title="Build the next coin people remember." copy="Plan, design, launch and monitor your Robinhood Chain project from one focused workspace." actions={socialActions}>
+  return <AuthLayout eyebrow="Welcome back" title="Build the next coin people remember." copy="Plan, design, launch and monitor your Robinhood Chain project from one focused workspace." actions={<AuthSocialActions />}>
     <form className="auth-form" onSubmit={submit}><div className="auth-form-heading"><h2>Sign in to PAN.AI</h2><p>Continue your projects where you left off.</p></div>
       {error ? <Notice>{error}</Notice> : null}<GoogleButton loading={googleLoading} onClick={google}/><div className="or"><span>or continue with email</span></div>
       <Field label="Email address" icon={Mail} type="email" autoComplete="email" required value={values.email} onChange={(e) => setValues({ ...values, email: e.target.value })} placeholder="you@example.com" />
@@ -86,7 +89,7 @@ export function RegisterPage() {
   };
   const google = async () => { setGoogleLoading(true); setError(""); try { const data = await endpoints.auth.google(); if (!data?.url) throw new Error("Google sign-in did not return an authorization URL."); window.location.assign(data.url); } catch (requestError) { setError(requestError.message); setGoogleLoading(false); } };
 
-  return <AuthLayout eyebrow="Create your workspace" title="From idea to live coin, without the busywork." copy="Your account gets dedicated payment and operational wallets, project history and secure credit accounting.">
+  return <AuthLayout eyebrow="Create your workspace" title="Build the next coin people remember." copy="Plan, design, launch and monitor your Robinhood Chain project from one focused workspace." actions={<AuthSocialActions />}>
     <form className="auth-form" onSubmit={submit}><div className="auth-form-heading"><h2>Create your PAN.AI account</h2><p>Your email must be verified before you can sign in.</p></div>
       {error ? <Notice>{error}</Notice> : null}<GoogleButton loading={googleLoading} onClick={google}/><div className="or"><span>or create with email</span></div>
       <Field label="Username" icon={UserRound} autoComplete="username" required value={values.username} onChange={(e) => setValues({ ...values, username: e.target.value })} placeholder="panbuilder" />
@@ -101,6 +104,7 @@ export function RegisterPage() {
 
 export function VerifyPage() {
   const location = useLocation(); const navigate = useNavigate();
+  const { refresh, setUser } = useAuth();
   const [email, setEmail] = useState(location.state?.email || localStorage.getItem("pan_pending_email") || "");
   const [code, setCode] = useState(""); const [cooldown, setCooldown] = useState(60);
   const [loading, setLoading] = useState(false); const [resending, setResending] = useState(false);
@@ -110,9 +114,12 @@ export function VerifyPage() {
   const verify = async (event) => {
     event.preventDefault(); setLoading(true); setError("");
     try {
-      await endpoints.auth.verify({ email: email.trim().toLowerCase(), code });
+      const result = await endpoints.auth.verify({ email: email.trim().toLowerCase(), code });
       localStorage.removeItem("pan_pending_email");
-      navigate("/login", { replace: true });
+      const verifiedUser = unwrapUser(result);
+      if (verifiedUser) setUser(verifiedUser);
+      else await refresh();
+      navigate("/", { replace: true });
     } catch (requestError) {
       setError(requestError.data?.code === "INVALID_OTP" ? "That code is invalid or has expired. Use the latest PAN code in your inbox, or send the code again." : requestError.message);
     } finally { setLoading(false); }

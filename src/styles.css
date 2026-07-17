@@ -81,7 +81,7 @@ svg { flex: 0 0 auto; }
 .auth-form-heading p { margin: 7px 0 0; color: var(--muted); }
 .google-button { height: 48px; display: flex; align-items: center; justify-content: center; gap: 11px; border: 1px solid var(--line); border-radius: 11px; background: #111713; cursor: pointer; font-weight: 700; transition: .2s; }
 .google-button:hover { border-color: #4b5a4e; background: #151d17; }
-.google-button span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #fff; color: #4285f4; font-weight: 900; }
+.google-button img { width: 20px; height: 20px; display: block; object-fit: contain; }
 .or { display: flex; align-items: center; gap: 12px; color: var(--muted-2); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
 .or::before,.or::after { content: ""; height: 1px; background: var(--line-soft); flex: 1; }
 .auth-field,.field { display: grid; gap: 8px; }
@@ -235,7 +235,7 @@ svg { flex: 0 0 auto; }
 .panel-title p,.builder-header p,.page-title p { margin: 0 0 5px; color: #5f6c62; font-size: 8px; font-weight: 850; letter-spacing: .14em; }
 .panel-title h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .completion { color: var(--green); font-size: 10px; font-weight: 850; }
-.image-upload { width: 100%; height: 136px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; overflow: hidden; padding: 0; color: #718076; border: 1px dashed #344037; border-radius: 12px; background: #0f1511; cursor: pointer; transition: .2s; }
+.image-upload { width: 100%; height: auto; aspect-ratio: 1 / 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; overflow: hidden; padding: 0; color: #718076; border: 1px dashed #344037; border-radius: 12px; background: #0f1511; cursor: pointer; transition: .2s; }
 .image-upload:hover { border-color: var(--green-dark); color: var(--green); }
 .image-upload svg { width: 23px; }.image-upload strong { color: #b7c2b9; font-size: 11px; }.image-upload small { font-size: 8px; }
 .image-upload.has-image img { width: 100%; height: 100%; object-fit: cover; }
@@ -301,6 +301,7 @@ svg { flex: 0 0 auto; }
 .wallet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
 .wallet-grid article { display: grid; grid-template-columns: 43px minmax(0,1fr) 30px; align-items: center; gap: 13px; padding: 18px; border: 1px solid var(--line-soft); border-radius: 13px; background: #0e1410; }
 .wallet-icon,.connection-icon { width: 43px; height: 43px; display: grid; place-items: center; border-radius: 11px; color: var(--green); background: var(--green-wash); }
+.connection-icon img { width: 22px; height: 22px; display: block; object-fit: contain; }
 .wallet-grid small { color: #5e6a61; font-size: 8px; letter-spacing: .08em; }.wallet-grid h3 { margin: 5px 0; font: 650 13px ui-monospace,monospace; }.wallet-grid p { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
 .wallet-grid article > button { border: 0; background: none; color: #6f7c72; cursor: pointer; }.wallet-grid article > button:hover { color: var(--green); }.wallet-grid svg { width: 17px; }
 .funding-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }.funding-actions article { display: grid; grid-template-columns: 43px minmax(0,1fr) auto; align-items: center; gap: 13px; padding: 18px; border: 1px solid var(--line-soft); border-radius: 13px; background: #0e1410; }.funding-actions small { color: #5e6a61; font-size: 8px; letter-spacing: .08em; }.funding-actions h3 { margin: 5px 0; font-size: 13px; }.funding-actions p { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.5; }.funding-actions .button { min-width: 105px; }
@@ -316,7 +317,8 @@ svg { flex: 0 0 auto; }
 .payment-methods button.active { border-color: var(--green-dark); box-shadow: inset 0 0 0 1px rgba(198,255,46,.15); }.payment-methods svg { color: var(--green); }.payment-methods strong { margin-top: 4px; }.payment-methods small { color: var(--muted); line-height: 1.4; }
 .purchase-estimate { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 5px; padding: 14px; border-radius: 10px; background: #111713; }.purchase-estimate span { color: var(--muted); font-size: 11px; }.purchase-estimate small { flex-basis: 100%; color: #5f6b62; font-size: 8px; }
 .payment-intent { display: grid; justify-items: center; text-align: center; gap: 12px; }.payment-intent > span { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 50%; color: #111800; background: var(--green); }.payment-intent h3,.payment-intent p { margin: 0; }.payment-intent p { color: var(--muted); line-height: 1.6; }.payment-intent label { width: 100%; display: grid; gap: 5px; text-align: left; padding: 13px; border-radius: 9px; background: #101612; }.payment-intent label code { overflow-wrap: anywhere; }.amount-input { position: relative; }.amount-input button { position: absolute; right: 6px; top: 6px; bottom: 6px; border: 0; border-radius: 6px; color: var(--green); background: #1a231c; cursor: pointer; font-size: 9px; font-weight: 850; }
-.deposit-address,.token-contract { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; padding: 14px; border: 1px solid var(--line-soft); border-radius: 10px; background: #101612; }.deposit-address small,.token-contract small { grid-column: 1/-1; color: var(--muted); font-size: 9px; }.deposit-address code,.token-contract code { min-width: 0; overflow-wrap: anywhere; color: #dce7de; font-size: 10px; line-height: 1.5; }.deposit-address button,.token-contract button { display: flex; align-items: center; gap: 6px; align-self: start; padding: 6px 8px; color: var(--green); border: 0; border-radius: 7px; background: var(--green-wash); cursor: pointer; font-size: 8px; font-weight: 800; }.deposit-address button svg,.token-contract button svg { width: 13px; }.automatic-payment-note { margin: -4px 0 0; color: #657168; font-size: 9px; line-height: 1.55; }
+.deposit-address,.token-contract { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; padding: 14px; border: 1px solid var(--line-soft); border-radius: 10px; background: #101612; }.deposit-address small,.token-contract small { grid-column: 1/-1; color: var(--muted); font-size: 9px; }.deposit-address code,.token-contract code { min-width: 0; overflow-wrap: anywhere; color: #dce7de; font-size: 10px; line-height: 1.5; }.deposit-address button,.token-contract button { display: flex; align-items: center; gap: 6px; align-self: start; padding: 6px 8px; color: var(--green); border: 0; border-radius: 7px; background: var(--green-wash); cursor: pointer; font-size: 8px; font-weight: 800; }.deposit-address button svg,.token-contract button svg { width: 13px; }
+.deposit-address button.copied { color: #101600; background: var(--green); }.automatic-payment-note { margin: -4px 0 0; color: #657168; font-size: 9px; line-height: 1.55; }
 
 /* Settings */
 .settings-layout { display: block; max-width: 920px; }
@@ -330,10 +332,11 @@ svg { flex: 0 0 auto; }
 .connection-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px; border: 1px solid var(--line-soft); border-radius: 11px; background: #101612; }.connection-row > div { display: flex; align-items: center; gap: 12px; }.connection-row strong,.connection-row small { display: block; }.connection-row small { margin-top: 4px; color: var(--muted); font-size: 9px; }.connected { display: inline-flex; align-items: center; gap: 5px; color: var(--green); font-size: 10px; font-weight: 750; }.connected svg { width: 14px; }
 .connection-list { display: grid; gap: 10px; }
 .terminal-field { max-width: 474px; }
-.settings-logout { width: fit-content; min-width: 130px; margin-top: 5px; } 
+.settings-logout { width: fit-content; min-width: 130px; margin-top: 5px; box-shadow: 0 8px 28px rgba(255,70,70,.22)!important; }
+.settings-logout:hover:not(:disabled) { box-shadow: 0 10px 34px rgba(255,70,70,.34)!important; } 
 .settings-card > .notice { margin-top: 12px; }
 .danger-zone { border-color: rgba(255,107,107,.2); }.danger-zone .settings-heading > span { color: #ff9292; background: rgba(255,107,107,.08); }
-.button-danger { color: white!important; background: #a73838!important; }.button-danger:hover { background: #c24646!important; }
+.button-danger { color: white!important; background: #a73838!important; box-shadow: 0 8px 24px rgba(255,70,70,.18)!important; }.button-danger:hover { background: #c24646!important; box-shadow: 0 10px 30px rgba(255,70,70,.3)!important; }
 
 /* Support */
 .ticket-layout { min-height: 620px; display: grid; grid-template-columns: minmax(330px,.8fr) minmax(420px,1.2fr); overflow: hidden; border: 1px solid var(--line-soft); border-radius: 14px; background: #0c110d; }
