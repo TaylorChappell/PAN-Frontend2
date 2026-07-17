@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Coins, LifeBuoy, Menu, MoreHorizontal, Pencil, Plus, Settings, ShieldCheck, Trash2, X } from "lucide-react";
+import { CircleHelp, Menu, MoreHorizontal, Pencil, Plus, Settings, ShieldCheck, Trash2, Wallet, X } from "lucide-react";
 import { endpoints } from "../api";
 import { useAuth } from "../auth";
 import { Button, Modal, Notice } from "./UI";
@@ -17,6 +17,10 @@ function accountPayload(data) {
   return data?.account ? { ...data, ...data.account } : data;
 }
 
+function ShellSkeleton() {
+  return <div className="shell-skeleton" aria-label="Loading workspace"><section><i className="skeleton-title"/><i className="skeleton-message wide"/><i className="skeleton-message"/><i className="skeleton-composer"/></section><aside><i className="skeleton-square"/><i/><i/><i className="tall"/></aside></div>;
+}
+
 export function AppShell() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -25,6 +29,7 @@ export function AppShell() {
   const freeCreditsBannerKey = `pan_free_credits_banner_seen:${user?.id || user?.email || "account"}`;
   const [projects, setProjects] = useState([]);
   const [account, setAccount] = useState(null);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [bannerClosed, setBannerClosed] = useState(sessionStorage.getItem("pan_credit_banner_closed") === "1");
   const [freeCreditsBannerSeen, setFreeCreditsBannerSeen] = useState(localStorage.getItem(freeCreditsBannerKey) === "1");
@@ -46,12 +51,16 @@ export function AppShell() {
   }, [mergeAccount]);
 
   const reload = useCallback(async () => {
-    const [projectResult, accountResult, creditResult] = await Promise.allSettled([
-      endpoints.projects.list(), endpoints.account.summary(), endpoints.credits.summary(),
-    ]);
-    if (projectResult.status === "fulfilled") setProjects(projectArray(projectResult.value));
-    if (accountResult.status === "fulfilled") mergeAccount(accountResult.value);
-    if (creditResult.status === "fulfilled") mergeAccount(creditResult.value);
+    try {
+      const [projectResult, accountResult, creditResult] = await Promise.allSettled([
+        endpoints.projects.list(), endpoints.account.summary(), endpoints.credits.summary(),
+      ]);
+      if (projectResult.status === "fulfilled") setProjects(projectArray(projectResult.value));
+      if (accountResult.status === "fulfilled") mergeAccount(accountResult.value);
+      if (creditResult.status === "fulfilled") mergeAccount(creditResult.value);
+    } finally {
+      setInitialLoading(false);
+    }
   }, [mergeAccount]);
 
   useEffect(() => { reload(); }, [reload]);
@@ -139,7 +148,7 @@ export function AppShell() {
           {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
           <p className="side-label">PROJECTS</p>
           <nav className="project-list">
-            {projects.slice(0, 12).map((project) => {
+            {initialLoading ? <div className="project-list-skeleton" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <i key={index}/>)}</div> : projects.map((project) => {
               const id = project.id || project.projectId;
               return <div className="project-list-item" key={id} onContextMenu={(event) => { event.preventDefault(); setProjectMenu({ id, x: event.clientX, y: event.clientY, project }); }}>
                 <NavLink to={`/projects/${id}`}>
@@ -149,25 +158,24 @@ export function AppShell() {
                 <button className="project-more" aria-label="Project options" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); setProjectMenu({ id, x: rect.right, y: rect.bottom, project }); }}><MoreHorizontal /></button>
               </div>;
             })}
-            {!projects.length ? <small className="no-projects">Your projects will appear here.</small> : null}
+            {!initialLoading && !projects.length ? <small className="no-projects">Your projects will appear here.</small> : null}
           </nav>
         </div>
         <div className="sidebar-bottom">
           <nav className="side-nav">
-            <NavLink to="/credits"><Coins />Credits & wallet</NavLink>
+            <NavLink to="/credits"><Wallet />Credits & wallet</NavLink>
             <NavLink to="/settings"><Settings />Settings</NavLink>
-            <NavLink to="/support"><LifeBuoy />Support</NavLink>
+            <NavLink to="/support"><CircleHelp />Support</NavLink>
             {(account?.isAdmin || user?.isAdmin || user?.role === "admin") ? <NavLink to="/admin"><ShieldCheck />Admin</NavLink> : null}
           </nav>
-          <Link to="/credits" className="account-card">
-            {avatar ? <img src={avatar} alt="" referrerPolicy="no-referrer" /> : <span className="avatar">{name.slice(0, 1).toUpperCase()}</span>}
-            <span><strong>{creditBalance.toLocaleString()} credits</strong><small>{Number(ethBalance).toFixed(4)} ETH available</small></span>
+          <Link to="/credits" className={`account-card ${initialLoading ? "loading" : ""}`}>
+            {initialLoading ? <><i className="account-avatar-skeleton"/><span className="account-copy-skeleton"><i/><i/></span></> : <>{avatar ? <img src={avatar} alt="" referrerPolicy="no-referrer" /> : <span className="avatar">{name.slice(0, 1).toUpperCase()}</span>}<span><strong>{creditBalance.toLocaleString()} credits</strong><small>{Number(ethBalance).toFixed(4)} ETH available</small></span></>}
           </Link>
         </div>
       </aside>
       <main className="app-main">
-        {banner ? <div className="credit-banner"><Coins size={17} /><span>{banner.text}</span><Link to="/credits" onClick={dismissBanner}>{banner.cta}</Link><button onClick={dismissBanner}><X size={16} /></button></div> : null}
-        <Outlet context={{ projects, setProjects, account, reload }} />
+        {!initialLoading && banner ? <div className="credit-banner"><Wallet size={17} /><span>{banner.text}</span><Link to="/credits" onClick={dismissBanner}>{banner.cta}</Link><button onClick={dismissBanner}><X size={16} /></button></div> : null}
+        {initialLoading ? <ShellSkeleton /> : <Outlet context={{ projects, setProjects, account, reload }} />}
       </main>
       {projectMenu ? <><button className="context-menu-backdrop" aria-label="Close project menu" onClick={() => setProjectMenu(null)} /><div className="project-context-menu" style={{ left: Math.min(projectMenu.x, window.innerWidth - 180), top: Math.min(projectMenu.y, window.innerHeight - 110) }}><button onClick={() => openProjectAction("rename", projectMenu.project)}><Pencil />Rename</button><button className="danger" onClick={() => openProjectAction("delete", projectMenu.project)}><Trash2 />Delete</button></div></> : null}
       {projectAction ? <Modal title={projectAction.action === "rename" ? "Rename project" : "Delete project"} subtitle={projectAction.action === "delete" ? "This permanently removes the conversation, uploaded images, generated files, website data, environment variables, exports, and queued work for this project." : "Choose a name that is easy to find in project history."} onClose={() => !projectWorking && setProjectAction(null)}><div className="modal-body">{projectAction.action === "rename" ? <label className="field"><span>Project name</span><input autoFocus maxLength="80" value={projectName} onChange={(event) => setProjectName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") finishProjectAction(); }} /></label> : <Notice>Deletion cannot be undone.</Notice>}<div className="modal-actions"><Button variant="ghost" onClick={() => setProjectAction(null)}>Cancel</Button><Button className={projectAction.action === "delete" ? "button-danger" : ""} loading={projectWorking} disabled={projectAction.action === "rename" && !projectName.trim()} onClick={finishProjectAction}>{projectAction.action === "rename" ? "Save name" : "Delete project"}</Button></div></div></Modal> : null}

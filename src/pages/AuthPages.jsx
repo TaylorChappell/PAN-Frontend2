@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, Sparkles } from "lucide-react";
 import { endpoints } from "../api";
 import { useAuth } from "../auth";
@@ -112,15 +112,17 @@ export function VerifyPage() {
 }
 
 export function ForgotPage() {
-  const [email, setEmail] = useState(""); const [loading, setLoading] = useState(false); const [sent, setSent] = useState(false); const [error, setError] = useState("");
-  const submit = async (event) => { event.preventDefault(); setLoading(true); setError(""); try { await endpoints.auth.forgot({ email }); setSent(true); } catch (e) { setError(e.message); } finally { setLoading(false); } };
-  return <AuthLayout eyebrow="Account recovery" title="Get back to building." copy="We’ll send a time-limited reset link to the verified email on your account."><form className="auth-form" onSubmit={submit}><Link className="back-link" to="/login"><ArrowLeft />Back to sign in</Link><div className="auth-form-heading"><h2>Reset your password</h2><p>Enter the email associated with PAN.</p></div>{error ? <Notice>{error}</Notice> : null}{sent ? <Notice type="success">If the account exists, a reset link is on its way.</Notice> : null}<Field label="Email address" icon={Mail} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com"/><Button loading={loading}>Send reset link</Button></form></AuthLayout>;
+  const navigate = useNavigate();
+  const [email, setEmail] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
+  const submit = async (event) => { event.preventDefault(); setLoading(true); setError(""); try { await endpoints.auth.forgot({ email }); localStorage.setItem("pan_reset_email", email); navigate("/reset-password", { state: { email } }); } catch (e) { setError(e.message); } finally { setLoading(false); } };
+  return <AuthLayout eyebrow="Account recovery" title="Get back to building." copy="We’ll send a six-digit reset code to the verified email on your account."><form className="auth-form" onSubmit={submit}><Link className="back-link" to="/login"><ArrowLeft />Back to sign in</Link><div className="auth-form-heading"><h2>Reset your password</h2><p>Enter the email associated with PAN.</p></div>{error ? <Notice>{error}</Notice> : null}<Field label="Email address" icon={Mail} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com"/><Button loading={loading}>Send reset code</Button></form></AuthLayout>;
 }
 
 export function ResetPage() {
-  const [params] = useSearchParams(); const navigate = useNavigate(); const token = params.get("token") || "";
-  const [password, setPassword] = useState(""); const [confirm, setConfirm] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
-  const rules = passwordRules(password); const valid = token && Object.values(rules).every(Boolean) && password === confirm;
-  const submit = async (event) => { event.preventDefault(); setLoading(true); setError(""); try { await endpoints.auth.reset({ token, password }); navigate("/login", { replace: true }); } catch (e) { setError(e.message); } finally { setLoading(false); } };
-  return <AuthLayout eyebrow="Choose a new password" title="Secure your PAN account." copy="Your new password must contain six letters, a number and a symbol."><form className="auth-form" onSubmit={submit}><div className="auth-form-heading"><h2>Create a new password</h2><p>This reset link can only be used once.</p></div>{!token ? <Notice>This reset link is missing its token.</Notice> : null}{error ? <Notice>{error}</Notice> : null}<Field label="New password" icon={LockKeyhole} type="password" value={password} onChange={(e) => setPassword(e.target.value)} /><Field label="Confirm password" icon={LockKeyhole} type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} /><Button loading={loading} disabled={!valid}>Update password</Button></form></AuthLayout>;
+  const location = useLocation(); const navigate = useNavigate();
+  const [email, setEmail] = useState(location.state?.email || localStorage.getItem("pan_reset_email") || "");
+  const [code, setCode] = useState(""); const [password, setPassword] = useState(""); const [confirm, setConfirm] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
+  const rules = passwordRules(password); const valid = /\S+@\S+\.\S+/.test(email) && code.length === 6 && Object.values(rules).every(Boolean) && password === confirm;
+  const submit = async (event) => { event.preventDefault(); setLoading(true); setError(""); try { await endpoints.auth.reset({ email, code, password }); localStorage.removeItem("pan_reset_email"); navigate("/login", { replace: true }); } catch (e) { setError(e.message); } finally { setLoading(false); } };
+  return <AuthLayout eyebrow="Choose a new password" title="Secure your PAN account." copy="Enter the six-digit reset code and choose a new password."><form className="auth-form" onSubmit={submit}><div className="auth-form-heading"><h2>Create a new password</h2><p>Use the code sent to your verified email.</p></div>{error ? <Notice>{error}</Notice> : null}<Field label="Email address" icon={Mail} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /><label className="code-field"><span>Reset code</span><input inputMode="numeric" pattern="[0-9]{6}" maxLength="6" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="000000" /></label><Field label="New password" icon={LockKeyhole} type="password" value={password} onChange={(e) => setPassword(e.target.value)} /><Field label="Confirm password" icon={LockKeyhole} type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} /><Button loading={loading} disabled={!valid}>Update password</Button></form></AuthLayout>;
 }

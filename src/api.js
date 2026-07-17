@@ -32,26 +32,33 @@ export function clearToken() {
 }
 
 function errorMessage(data, status) {
+  if (data?.code === "CONFIGURATION_MISSING" && Array.isArray(data?.missing) && data.missing.some((name) => /RESEND_API_KEY|EMAIL_FROM/.test(name))) {
+    return "Email signup is not configured on the backend. Add RESEND_API_KEY and EMAIL_FROM in Railway, then redeploy.";
+  }
   return data?.error?.message || data?.error || data?.message || data?.detail || `Request failed (${status})`;
 }
 
 export async function api(path, options = {}) {
+  const { authRemember, ...requestOptions } = options;
   const token = getToken();
-  const headers = new Headers(options.headers || {});
-  const bodyIsForm = options.body instanceof FormData;
-  if (options.body && !bodyIsForm && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const headers = new Headers(requestOptions.headers || {});
+  const bodyIsForm = requestOptions.body instanceof FormData;
+  if (requestOptions.body && !bodyIsForm && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
 
   let response;
   try {
     response = await fetch(`${API_BASE}${path}`, {
-      ...options,
+      ...requestOptions,
       headers,
       credentials: "include",
     });
   } catch (_error) {
     throw new ApiError("Could not reach PAN. Check the backend URL and CORS settings.");
   }
+
+  const responseToken = response.headers.get("set-auth-token");
+  if (responseToken) setToken(responseToken, authRemember !== false);
 
   const contentType = response.headers.get("content-type") || "";
   const data = response.status === 204
@@ -92,13 +99,13 @@ export const endpoints = {
   health: () => api("/api/health"),
   auth: {
     me: () => api("/api/auth/get-session"),
-    login: ({ email, password, remember }) => api("/api/auth/sign-in/email", { method: "POST", body: json({ email, password, rememberMe: remember !== false }) }),
+    login: ({ email, password, remember }) => api("/api/auth/sign-in/email", { method: "POST", body: json({ email, password, rememberMe: remember !== false }), authRemember: remember !== false }),
     register: ({ username, email, password }) => api("/api/auth/sign-up/email", { method: "POST", body: json({ name: username, username, email, password, callbackURL: `${window.location.origin}${window.location.pathname}` }) }),
-    verify: (payload) => api("/api/auth/verify-email", { method: "POST", body: json(payload) }),
-    resend: (payload) => api("/api/auth/resend-verification", { method: "POST", body: json(payload) }),
-    forgot: ({ email }) => api("/api/auth/request-password-reset", { method: "POST", body: json({ email, redirectTo: `${window.location.origin}${window.location.pathname}#/reset-password` }) }),
-    reset: (payload) => api("/api/auth/reset-password", { method: "POST", body: json(payload) }),
-    logout: () => api("/api/auth/sign-out", { method: "POST" }),
+    verify: ({ email, code, otp }) => api("/api/auth/email-otp/verify-email", { method: "POST", body: json({ email, otp: otp || code }) }),
+    resend: ({ email }) => api("/api/auth/email-otp/send-verification-otp", { method: "POST", body: json({ email, type: "email-verification" }) }),
+    forgot: ({ email }) => api("/api/auth/email-otp/request-password-reset", { method: "POST", body: json({ email }) }),
+    reset: ({ email, code, otp, password }) => api("/api/auth/email-otp/reset-password", { method: "POST", body: json({ email, otp: otp || code, password }) }),
+    logout: () => api("/api/auth/sign-out", { method: "POST", body: json({}) }),
     google: () => api("/api/auth/sign-in/social", { method: "POST", body: json({ provider: "google", callbackURL: `${window.location.origin}${window.location.pathname}` }) }),
   },
   account: {
