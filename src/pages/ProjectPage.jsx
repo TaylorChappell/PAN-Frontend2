@@ -148,7 +148,8 @@ export function ProjectPage() {
       if (projectChanges.imageUrl) await endpoints.projects.update(id, projectChanges);
       setProject((old) => ({ ...old, ...(data?.project ? normalizeProject(data.project) : {}), ...projectChanges, messages: [...old.messages, assistantMessage] }));
       reload();
-      if (data?.website?.id) navigate(`/projects/${id}/website/${data.website.id}`);
+      if (data?.website?.id && ["ready", "published"].includes(data.website.status)) navigate(`/projects/${id}/website/${data.website.id}`);
+      else if (data?.website?.status === "failed") setError(data.website.errorMessage || "Website Studio could not complete the build.");
     } catch (e) { setError(e.message); setAttachments(outgoingAttachments); }
     finally { setThinking(false); }
   };
