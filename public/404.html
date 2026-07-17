@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Opening PAN</title>
+  </head>
+  <body>
+    <script>
+      (function () {
+        var githubPages = window.location.hostname.endsWith(".github.io");
+        var parts = window.location.pathname.split("/").filter(Boolean);
+        var base = githubPages && parts.length ? "/" + parts.shift() + "/" : "/";
+        var route = "/" + parts.join("/");
+        if (!githubPages) route = window.location.pathname;
+        window.location.replace(base + "#" + route + window.location.search);
+      }());
+    </script>
+  </body>
+</html>
