@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { Coins, LifeBuoy, Menu, MoreHorizontal, Pencil, Plus, Settings, ShieldCheck, Trash2, X } from "lucide-react";
 import { endpoints } from "../api";
 import { useAuth } from "../auth";
-import { Button, Modal, Notice, shortAddress } from "./UI";
+import { Button, Modal, Notice } from "./UI";
 
 function projectArray(data) {
   return data?.projects || data?.items || (Array.isArray(data) ? data : []);
@@ -124,7 +124,7 @@ export function AppShell() {
           </nav>
           <Link to="/credits" className="account-card">
             {avatar ? <img src={avatar} alt="" referrerPolicy="no-referrer" /> : <span className="avatar">{name.slice(0, 1).toUpperCase()}</span>}
-            <span><strong>{creditBalance.toLocaleString()} credits</strong><small>{Number(ethBalance).toFixed(4)} ETH · {shortAddress(operationsWallet?.address || account?.walletAddress || user?.walletAddress)}</small></span>
+            <span><strong>{creditBalance.toLocaleString()} credits</strong><small>{Number(ethBalance).toFixed(4)} ETH available</small></span>
           </Link>
         </div>
       </aside>

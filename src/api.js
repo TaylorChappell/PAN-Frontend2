@@ -132,7 +132,7 @@ export const endpoints = {
   },
   credits: {
     summary: () => api("/api/credits"),
-    purchase: (payload) => api("/api/credits/intents", { method: "POST", body: json({ paymentAsset: payload.asset === "ETH" ? "eth" : "pan", amount: String(payload.amount), idempotencyKey: crypto.randomUUID() }) }),
+    quote: (payload) => api("/api/credits/quote", { method: "POST", body: json({ paymentAsset: payload.asset === "ETH" ? "eth" : "pan", amount: Number(payload.amount) }) }),
     history: () => api("/api/credits/transactions"),
   },
   wallets: {
