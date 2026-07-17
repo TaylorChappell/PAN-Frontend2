@@ -13,6 +13,10 @@ function balanceFrom(data, user) {
   return Number(data?.creditBalance ?? data?.credits?.balance ?? data?.credits ?? data?.balance ?? user?.creditBalance ?? user?.credits ?? 0);
 }
 
+function accountPayload(data) {
+  return data?.account ? { ...data, ...data.account } : data;
+}
+
 export function AppShell() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -29,16 +33,43 @@ export function AppShell() {
   const [projectWorking, setProjectWorking] = useState(false);
   const [error, setError] = useState("");
 
+  const mergeAccount = useCallback((value) => {
+    if (!value) return;
+    setAccount((old) => ({ ...(old || {}), ...(accountPayload(value) || {}) }));
+  }, []);
+
+  const refreshAccount = useCallback(async () => {
+    const result = await endpoints.credits.summary();
+    mergeAccount(result);
+    return result;
+  }, [mergeAccount]);
+
   const reload = useCallback(async () => {
     const [projectResult, accountResult, creditResult] = await Promise.allSettled([
       endpoints.projects.list(), endpoints.account.summary(), endpoints.credits.summary(),
     ]);
     if (projectResult.status === "fulfilled") setProjects(projectArray(projectResult.value));
-    if (accountResult.status === "fulfilled") setAccount(accountResult.value?.account || accountResult.value);
-    if (creditResult.status === "fulfilled") setAccount((old) => ({ ...(old || {}), ...(creditResult.value || {}) }));
-  }, []);
+    if (accountResult.status === "fulfilled") mergeAccount(accountResult.value);
+    if (creditResult.status === "fulfilled") mergeAccount(creditResult.value);
+  }, [mergeAccount]);
 
   useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible" && location.pathname !== "/credits") refreshAccount().catch(() => {});
+    };
+    const receiveAccountUpdate = (event) => mergeAccount(event.detail);
+    const timer = window.setInterval(refreshWhenVisible, 5_000);
+    window.addEventListener("focus", refreshWhenVisible);
+    window.addEventListener("pan:account-updated", receiveAccountUpdate);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshWhenVisible);
+      window.removeEventListener("pan:account-updated", receiveAccountUpdate);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [location.pathname, mergeAccount, refreshAccount]);
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
   const createProject = async () => {

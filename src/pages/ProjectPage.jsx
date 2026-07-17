@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { ArrowUpRight, Coins, Earth, Image as ImageIcon, LoaderCircle, MessageSquare, Paperclip, Rocket, Send, Sparkles, Upload, Wallet, X } from "lucide-react";
 import { endpoints, mediaUrl } from "../api";
@@ -32,6 +32,12 @@ function extractReply(data) {
     || "PAN finished the request.";
 }
 
+function projectFields(data) {
+  const normalized = normalizeProject(data);
+  const { messages: _messages, ...fields } = normalized;
+  return fields;
+}
+
 function Field({ label, optional, children }) {
   return <label className="field"><span>{label}{optional ? <i>Optional</i> : <b>Required</b>}</span>{children}</label>;
 }
@@ -57,6 +63,12 @@ export function ProjectPage() {
   const messageInput = useRef(null);
   const feedRef = useRef(null);
 
+  const mergeServerProject = useCallback((data) => {
+    if (!data) return;
+    const fields = projectFields(data);
+    setProject((old) => ({ ...old, ...fields, messages: old.messages }));
+  }, []);
+
   useEffect(() => {
     if (!projectId) { setProject(blankProject); setLoading(false); return; }
     setLoading(true); setError("");
@@ -64,6 +76,18 @@ export function ProjectPage() {
   }, [projectId]);
 
   useEffect(() => { feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: "smooth" }); }, [project.messages, thinking]);
+  useEffect(() => {
+    if (!thinking || !project.id) return undefined;
+    let active = true;
+    const refresh = async () => {
+      try {
+        const latest = await endpoints.projects.summary(project.id);
+        if (active) mergeServerProject(latest);
+      } catch { /* The final run response still performs a source-of-truth refresh. */ }
+    };
+    const timer = window.setInterval(refresh, 1_500);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [mergeServerProject, project.id, thinking]);
   useEffect(() => {
     const input = messageInput.current;
     if (!input) return;
@@ -146,7 +170,16 @@ export function ProjectPage() {
       const assistantMessage = { id: data?.message?.id || data?.id || crypto.randomUUID(), role: "assistant", content: extractReply(data), attachments: generatedAsset ? [generatedAsset] : [] };
       const projectChanges = data?.asset?.kind === "logo" && data.asset.url ? { imageUrl: data.asset.url } : {};
       if (projectChanges.imageUrl) await endpoints.projects.update(id, projectChanges);
-      setProject((old) => ({ ...old, ...(data?.project ? normalizeProject(data.project) : {}), ...projectChanges, messages: [...old.messages, assistantMessage] }));
+      let latestProject = data?.project || null;
+      if (!latestProject) {
+        try {
+          const refreshed = await endpoints.projects.summary(id);
+          latestProject = refreshed?.project || refreshed;
+        }
+        catch { latestProject = null; }
+      }
+      const serverFields = latestProject ? projectFields(latestProject) : {};
+      setProject((old) => ({ ...old, ...serverFields, ...projectChanges, messages: [...old.messages, assistantMessage] }));
       reload();
       if (data?.website?.id && ["ready", "published"].includes(data.website.status)) navigate(`/projects/${id}/website/${data.website.id}`);
       else if (data?.website?.status === "failed") setError(data.website.errorMessage || "Website Studio could not complete the build.");

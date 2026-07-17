@@ -108,6 +108,7 @@ export const endpoints = {
   projects: {
     list: () => api("/api/projects"),
     get: (id) => api(`/api/projects/${encodeURIComponent(id)}`),
+    summary: (id) => api(`/api/projects/${encodeURIComponent(id)}?summary=1`),
     create: (payload) => api("/api/projects", { method: "POST", body: json(payload) }),
     update: (id, payload) => api(`/api/projects/${encodeURIComponent(id)}`, { method: "PATCH", body: json(payload) }),
     remove: (id) => api(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" }),
