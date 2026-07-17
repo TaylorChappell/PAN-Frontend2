@@ -28,7 +28,6 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [bannerClosed, setBannerClosed] = useState(sessionStorage.getItem("pan_credit_banner_closed") === "1");
   const [freeCreditsBannerSeen, setFreeCreditsBannerSeen] = useState(localStorage.getItem(freeCreditsBannerKey) === "1");
-  const [creating, setCreating] = useState(false);
   const [projectMenu, setProjectMenu] = useState(null);
   const [projectAction, setProjectAction] = useState(null);
   const [projectName, setProjectName] = useState("");
@@ -74,15 +73,9 @@ export function AppShell() {
   }, [location.pathname, mergeAccount, refreshAccount]);
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
-  const createProject = async () => {
-    setCreating(true); setError("");
-    try {
-      const data = await endpoints.projects.create({ name: "Untitled coin", performance: "medium" });
-      const project = data?.project || data;
-      setProjects((old) => [project, ...old]);
-      navigate(`/projects/${project.id || project.projectId}`);
-    } catch (requestError) { setError(requestError.message); }
-    finally { setCreating(false); }
+  const createProject = () => {
+    setError("");
+    navigate("/", { state: { newProjectNonce: crypto.randomUUID() } });
   };
 
   const creditBalance = balanceFrom(account, user);
@@ -142,7 +135,7 @@ export function AppShell() {
       <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="sidebar-top">
           <div className="brand-row"><Link to="/" className="brand"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" />PAN.AI</Link><button className="mobile-close" onClick={() => setSidebarOpen(false)}><X /></button></div>
-          <Button className="new-project" onClick={createProject} loading={creating}><Plus size={18} />New project</Button>
+          <Button className="new-project" onClick={createProject}><Plus size={18} />New project</Button>
           {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
           <p className="side-label">PROJECTS</p>
           <nav className="project-list">

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { ArrowUpRight, CheckCircle2, Coins, Earth, Image as ImageIcon, LoaderCircle, MessageSquare, Paperclip, Rocket, Send, Sparkles, Upload, Wallet, X } from "lucide-react";
 import { endpoints, mediaUrl } from "../api";
 import { Button, Modal, Notice, Skeleton, money } from "../components/UI";
@@ -69,6 +69,7 @@ function resolveSocialLink(rawValue, type) {
 export function ProjectPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { setProjects, reload } = useOutletContext();
   const [project, setProject] = useState(blankProject);
   const [loading, setLoading] = useState(Boolean(projectId));
@@ -76,6 +77,7 @@ export function ProjectPage() {
   const [thinking, setThinking] = useState(false);
   const [message, setMessage] = useState("");
   const [attachments, setAttachments] = useState([]);
+  const [pendingCoinImage, setPendingCoinImage] = useState(null);
   const [error, setError] = useState("");
   const [launchOpen, setLaunchOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
@@ -94,10 +96,18 @@ export function ProjectPage() {
   }, []);
 
   useEffect(() => {
-    if (!projectId) { setProject(blankProject); setLoading(false); return; }
+    if (!projectId) {
+      setProject({ ...blankProject, messages: [] });
+      setPendingCoinImage(null);
+      setAttachments([]);
+      setMessage("");
+      setError("");
+      setLoading(false);
+      return;
+    }
     setLoading(true); setError("");
     endpoints.projects.get(projectId).then((data) => setProject(normalizeProject(data))).catch((e) => setError(e.message)).finally(() => setLoading(false));
-  }, [projectId]);
+  }, [projectId, location.state?.newProjectNonce]);
 
   useEffect(() => { feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: "smooth" }); }, [project.messages, thinking]);
   useEffect(() => {
@@ -130,21 +140,45 @@ export function ProjectPage() {
     if (project.id) return project.id;
     const data = await endpoints.projects.create({ name: project.coinName || "Untitled coin", performance: project.performance });
     const created = normalizeProject(data);
-    setProject((old) => ({ ...old, ...created }));
-    setProjects((old) => [created, ...old.filter((item) => item.id !== created.id)]);
+    let hydrated = { ...created, performance: project.performance || "medium" };
+    setProject((old) => ({ ...old, ...hydrated, messages: old.messages }));
+    setProjects((old) => [hydrated, ...old.filter((item) => item.id !== created.id)]);
     navigate(`/projects/${created.id}`, { replace: true });
+
+    const initialChanges = {
+      name: project.coinName || project.name || "Untitled coin",
+      coinName: project.coinName || "",
+      ticker: project.ticker || "",
+      description: project.description || "",
+      website: project.website || "",
+      xAccount: resolvedX.url || project.xAccount || "",
+      telegram: resolvedTelegram.url || project.telegram || "",
+    };
+    try {
+      if (pendingCoinImage) {
+        const uploaded = await endpoints.assets.upload(pendingCoinImage, { projectId: created.id, kind: "logo", visibility: "public" });
+        initialChanges.imageUrl = uploaded.url;
+        initialChanges.imageFileName = pendingCoinImage.name;
+        setPendingCoinImage(null);
+      }
+      await endpoints.projects.update(created.id, initialChanges);
+      hydrated = { ...hydrated, ...initialChanges };
+      setProject((old) => ({ ...old, ...hydrated, messages: old.messages }));
+      setProjects((old) => old.map((item) => item.id === created.id ? hydrated : item));
+    } catch (metadataError) {
+      setError(`The project was started, but some coin details could not be saved: ${metadataError.message}`);
+    }
     return created.id;
   };
 
   const persist = async (changes) => {
     setProject((old) => ({ ...old, ...changes }));
+    if (!project.id) return;
     window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(async () => {
       setSaving(true);
-      try {
-        const id = await ensureProject();
-        await endpoints.projects.update(id, changes);
-      } catch (e) { setError(e.message); }
+      try { await endpoints.projects.update(project.id, changes); }
+      catch (e) { setError(e.message); }
       finally { setSaving(false); }
     }, 550);
   };
@@ -155,8 +189,18 @@ export function ProjectPage() {
     if (file.size > 8 * 1024 * 1024) return setError("Coin images must be under 8 MB.");
     setSaving(true); setError("");
     try {
-      const id = await ensureProject();
-      const result = await endpoints.assets.upload(file, { projectId: id, kind: "logo", visibility: "public" });
+      if (!project.id) {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        setPendingCoinImage(file);
+        setProject((old) => ({ ...old, imageUrl: dataUrl, imageFileName: file.name }));
+        return;
+      }
+      const result = await endpoints.assets.upload(file, { projectId: project.id, kind: "logo", visibility: "public" });
       await persist({ imageUrl: result.url, imageFileName: file.name });
     } catch (e) { setError(e.message); }
     finally { setSaving(false); }
@@ -213,16 +257,26 @@ export function ProjectPage() {
     finally { setThinking(false); }
   };
 
-  const openWebsiteStudio = async () => {
-    try { navigate(`/projects/${await ensureProject()}/website`); }
-    catch (e) { setError(e.message); }
+  const openWebsiteStudio = () => {
+    if (!project.id) {
+      setError("Send your first message to PAN before opening Website Studio.");
+      messageInput.current?.focus();
+      return;
+    }
+    navigate(`/projects/${project.id}/website`);
   };
 
   const generateImage = async () => {
     if (!imagePrompt.trim()) return;
+    if (!project.id) {
+      setImageOpen(false);
+      setError("Send your first message to PAN before generating project artwork.");
+      messageInput.current?.focus();
+      return;
+    }
     setThinking(true); setError("");
     try {
-      const id = await ensureProject();
+      const id = project.id;
       const data = await endpoints.images.generate({ projectId: id, prompt: imagePrompt, performance: project.performance, purpose: "coin_logo" });
       const url = data?.asset?.url || data?.imageUrl || data?.image?.url || data?.url;
       if (!url) throw new Error("Image generation finished without an image URL.");
@@ -232,9 +286,15 @@ export function ProjectPage() {
   };
 
   const launchCoin = async () => {
+    if (!project.id) {
+      setLaunchOpen(false);
+      setError("Send your first message to PAN before launching the project.");
+      messageInput.current?.focus();
+      return;
+    }
     setThinking(true); setError("");
     try {
-      const id = await ensureProject();
+      const id = project.id;
       const payload = { devBuyEth: Number(launch.devBuyEth || 0), feeWalletAddress: launch.feeWalletAddress, walletMode: launch.walletMode };
       const quote = await endpoints.projects.launchPreview(id, payload);
       if (quote?.preview?.canAfford === false) throw new Error(`The operations wallet does not have enough ETH for the ${quote.preview.fees?.totalEth || "current"} ETH launch total.`);
@@ -261,12 +321,12 @@ export function ProjectPage() {
         <div className="chat-scroll-region">
           {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
           <div className="chat-feed" ref={feedRef} role="log" aria-label="AI chat messages" aria-live="polite" tabIndex={0}>
-            {!project.messages.length ? <><div className="pan-message"><span className="pan-avatar"><i /></span><div><small>PAN · PROJECT AGENT</small><p>Tell me what you want to create. I’ll ask whenever an important detail is unclear.</p><p>To launch a coin, I’ll need its name, ticker and image. Website and X account are optional.</p></div></div><div className="suggestion-row"><button onClick={() => send("Help me shape the idea for my coin") }><MessageSquare />Shape my idea</button><button onClick={() => setImageOpen(true)}><Sparkles />Generate a logo</button><button onClick={openWebsiteStudio}><Earth />Build its website</button></div></> : null}
-            {project.messages.map((item) => item.role === "user" ? <div className="user-message" key={item.id}>{item.content || item.message ? <p>{item.content || item.message}</p> : null}{item.attachments?.length ? <div className="message-images">{item.attachments.map((image, index) => <img key={image.id || image.url || index} src={mediaUrl(image.url || image.dataUrl)} alt={image.fileName || "Chat attachment"} />)}</div> : null}</div> : <div className="pan-message" key={item.id}><span className="pan-avatar"><i /></span><div><small>PAN · PROJECT AGENT</small><p><InlineMarkdown>{item.content || item.message}</InlineMarkdown></p>{item.attachments?.length ? <div className="message-images">{item.attachments.map((image, index) => <img key={image.id || image.url || index} src={mediaUrl(image.url || image.dataUrl)} alt={image.fileName || "Generated image"} />)}</div> : null}</div></div>)}
-            {thinking ? <div className="pan-message thinking"><span className="pan-avatar"><i /></span><div><small>PAN IS THINKING</small><div className="thinking-dots"><i/><i/><i/></div></div></div> : null}
+            {!project.messages.length ? <><div className="pan-message"><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>PAN · PROJECT AGENT</small><p>Tell me what you want to create. I’ll ask whenever an important detail is unclear.</p><p>To launch a coin, I’ll need its name, ticker and image. Website and X account are optional.</p></div></div><div className="suggestion-row"><button onClick={() => send("Help me shape the idea for my coin") }><MessageSquare />Shape my idea</button><button onClick={() => setImageOpen(true)}><Sparkles />Generate a logo</button><button onClick={openWebsiteStudio}><Earth />Build its website</button></div></> : null}
+            {project.messages.map((item) => item.role === "user" ? <div className="user-message" key={item.id}>{item.content || item.message ? <p>{item.content || item.message}</p> : null}{item.attachments?.length ? <div className="message-images">{item.attachments.map((image, index) => <img key={image.id || image.url || index} src={mediaUrl(image.url || image.dataUrl)} alt={image.fileName || "Chat attachment"} />)}</div> : null}</div> : <div className="pan-message" key={item.id}><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>PAN · PROJECT AGENT</small><p><InlineMarkdown>{item.content || item.message}</InlineMarkdown></p>{item.attachments?.length ? <div className="message-images">{item.attachments.map((image, index) => <img key={image.id || image.url || index} src={mediaUrl(image.url || image.dataUrl)} alt={image.fileName || "Generated image"} />)}</div> : null}</div></div>)}
+            {thinking ? <div className="pan-message thinking"><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>PAN IS THINKING</small><div className="thinking-dots"><i/><i/><i/></div></div></div> : null}
           </div>
         </div>
-        <div className="composer-dock"><div className="composer" onPaste={handlePaste}>{attachments.length ? <div className="attachment-strip">{attachments.map((image) => <div key={image.id}><img src={image.dataUrl} alt={image.fileName} /><button aria-label={`Remove ${image.fileName}`} onClick={() => setAttachments((old) => old.filter((item) => item.id !== image.id))}><X /></button><span>{image.fileName}</span></div>)}</div> : null}<textarea ref={messageInput} rows="1" aria-label="Message PAN" placeholder="Message PAN…" value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} /><div><span><button aria-label="Attach images" onClick={() => chatImageInput.current?.click()}><Paperclip /></button><button aria-label="Generate image" onClick={() => setImageOpen(true)}><ImageIcon /></button><input ref={chatImageInput} hidden multiple type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { addChatImages(e.target.files); e.target.value = ""; }}/></span><span className="composer-actions"><label>Performance<select aria-label="Performance" value={project.performance} onChange={(e) => persist({ performance: e.target.value })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="extra_high">Extra high</option></select></label><button className="send-button" disabled={(!message.trim() && !attachments.length) || thinking} onClick={() => send()} aria-label="Send"><Send /></button></span></div></div></div>
+        <div className="composer-dock"><div className="composer" onPaste={handlePaste}>{attachments.length ? <div className="attachment-strip">{attachments.map((image) => <div key={image.id}><img src={image.dataUrl} alt={image.fileName} /><button aria-label={`Remove ${image.fileName}`} onClick={() => setAttachments((old) => old.filter((item) => item.id !== image.id))}><X /></button><span>{image.fileName}</span></div>)}</div> : null}<textarea ref={messageInput} rows="1" aria-label="Message PAN" placeholder="Message PAN…" value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} /><div><span><button aria-label="Attach images" title="Upload images" onClick={() => chatImageInput.current?.click()}><Paperclip /></button><button aria-label="Generate image" title="Generate image" onClick={() => setImageOpen(true)}><ImageIcon /></button><button aria-label="Open Website Studio" title="Website Studio" onClick={openWebsiteStudio}><Earth /></button><input ref={chatImageInput} hidden multiple type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { addChatImages(e.target.files); e.target.value = ""; }}/></span><span className="composer-actions"><label>Performance<select aria-label="Performance" value={project.performance} onChange={(e) => persist({ performance: e.target.value })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="extra_high">Extra high</option></select></label><button className="send-button" disabled={(!message.trim() && !attachments.length) || thinking} onClick={() => send()} aria-label="Send"><Send /></button></span></div></div></div>
       </section>
       <aside className="details-panel">
         {launched ? <CoinStats project={project} /> : <><div className="panel-title"><div><p>PROJECT OBJECT</p><h2>Coin details</h2></div><span className="completion">{complete}/3</span></div>

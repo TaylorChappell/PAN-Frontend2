@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowUpRight, Check, Code2, Download, Eye, FileCode2, FolderGit2, GitBranch, Globe2, KeyRound, LoaderCircle, Play, Plus, Rocket, Save, Server, TerminalSquare } from "lucide-react";
+import { ArrowUpRight, Check, Code2, Download, Eye, FileCode2, FolderGit2, GitBranch, Globe2, KeyRound, LoaderCircle, Play, Plus, Rocket, Save, Server } from "lucide-react";
 import { endpoints } from "../api";
 import { Button, EmptyState, Modal, Notice, Skeleton } from "../components/UI";
 
@@ -90,4 +90,4 @@ export function WebsiteBuilderPage() {
   </div>;
 }
 
-function SparkIcon() { return <TerminalSquare size={18}/>; }
+function SparkIcon() { return <img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" />; }
