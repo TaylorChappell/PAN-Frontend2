@@ -719,11 +719,6 @@ svg { flex: 0 0 auto; }
 .roadmap-details > p { min-height: 0; overflow: hidden; margin: 0; padding: 0 56px 0 68px; color: #83948a; font-size: 11px; line-height: 1.75; transition: padding .32s ease; }
 .home-roadmap-list article.open .roadmap-details { grid-template-rows: 1fr; }
 .home-roadmap-list article.open .roadmap-details > p { padding-bottom: 28px; }
-.home-whitepaper { padding-top: 85px; padding-bottom: 85px; }
-.home-whitepaper > .home-reveal { min-height: 365px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 62px 48px; border: 1px solid rgba(198,255,46,.12); border-radius: 23px; background: radial-gradient(circle at 50% 100%,rgba(198,255,46,.08),transparent 42%),linear-gradient(145deg,#08120c,#050a07); }
-.home-whitepaper-actions { display: flex; justify-content: center; margin-top: 34px; }
-.whitepaper-coming-soon { min-height: 50px; display: inline-flex; align-items: center; gap: 10px; padding: 0 20px; color: #8d9b92; border: 1px solid rgba(255,255,255,.09); border-radius: 10px; background: rgba(255,255,255,.025); font-size: 10px; font-weight: 800; }
-.whitepaper-coming-soon svg { width: 16px; color: var(--home-green); }
 .home-final-cta { position: relative; z-index: 2; width: min(1320px, calc(100% - 56px)); min-height: 590px; display: grid; place-items: center; overflow: hidden; margin: 40px auto 110px; padding: 80px 25px; border: 1px solid rgba(198,255,46,.12); border-radius: 25px; text-align: center; background: radial-gradient(circle at 50% 115%,rgba(198,255,46,.13),transparent 42%),#061009; }
 .home-final-cta::before,.home-final-cta::after { content: ""; position: absolute; width: 620px; height: 620px; border: 1px solid rgba(198,255,46,.055); border-radius: 50%; }
 .home-final-cta::after { width: 430px; height: 430px; }
@@ -783,15 +778,13 @@ svg { flex: 0 0 auto; }
   @keyframes hero-float { 0%,100% { transform: scale(.88) rotateY(-5deg) translateY(0); } 50% { transform: scale(.88) rotateY(-4deg) translateY(-8px); } }
   .hero-floating-live { left: 4px; }.hero-floating-pons { right: 2px; }
   .home-section { padding: 100px 0; }
-  .home-workflow,.home-token-layout,.home-roadmap,.home-whitepaper-card { grid-template-columns: 1fr; }
+  .home-workflow,.home-token-layout,.home-roadmap { grid-template-columns: 1fr; }
   .home-workflow-graphic { order: -1; min-height: 530px; }
   .home-pons-card { grid-template-columns: 1fr; gap: 20px; }
   .home-chain-graphic { width: min(480px,100%); margin: auto; }
   .home-token-layout { gap: 30px; }
   .home-token-visual { min-height: 490px; }
   .home-roadmap { gap: 50px; }
-  .home-whitepaper-card { gap: 55px; padding: 55px 35px; }
-  .whitepaper-document { min-height: 320px; }
   .home-footer { grid-template-columns: 1fr auto; }
   .home-socials { justify-content: flex-end; }
   .home-footer-links { grid-column: 1/-1; grid-row: 2; }
@@ -831,8 +824,6 @@ svg { flex: 0 0 auto; }
   .token-flow-one { left: -15px; }.token-flow-two { right: -20px; }.token-flow-three { left: -4px; }
   .home-roadmap-list article { grid-template-columns: 34px minmax(0,1fr); }
   .home-roadmap-list article > em,.home-roadmap-list article > svg { display: none; }
-  .home-whitepaper-card { padding: 42px 22px; }
-  .whitepaper-copy h2 { font-size: 41px; }
   .home-final-cta { min-height: 520px; margin-bottom: 75px; padding: 65px 18px; }
   .home-final-cta h2 { font-size: 45px; }
   .home-final-cta .home-reveal > div { width: 100%; display: grid; }

@@ -7,7 +7,6 @@ import {
   CircleDollarSign,
   Coins,
   ExternalLink,
-  FileText,
   Globe2,
   Image,
   Layers3,
@@ -149,7 +148,6 @@ export function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openRoadmap, setOpenRoadmap] = useState(0);
   const ponsUrl = import.meta.env.VITE_PONS_TOKEN_URL || "https://pons.family";
-  const whitepaperUrl = import.meta.env.VITE_WHITEPAPER_URL;
 
   useEffect(() => {
     const items = [...document.querySelectorAll(".home-reveal")];
@@ -179,7 +177,6 @@ export function HomePage() {
         <button onClick={() => navigateSection("why-pan")}>Why PAN</button>
         <button onClick={() => navigateSection("tokenomics")}>Tokenomics</button>
         <button onClick={() => navigateSection("roadmap")}>Roadmap</button>
-        <button onClick={() => navigateSection("whitepaper")}>Whitepaper</button>
       </nav>
       <div className="home-nav-actions">
         <Link className="home-nav-cta" to="/login">Sign in</Link>
@@ -243,7 +240,7 @@ export function HomePage() {
     </section>
 
     <section className="home-section home-tokenomics" id="tokenomics">
-      <Reveal><SectionHeading eyebrow="$PAN TOKENOMICS" title="Utility that grows with the product." copy="$PAN is designed around access, usage and participation in the PAN ecosystem, not empty complexity. Exact contract and allocation details can be published transparently through the whitepaper and Pons listing." align="center" /></Reveal>
+      <Reveal><SectionHeading eyebrow="$PAN TOKENOMICS" title="Utility that grows with the product." copy="$PAN is designed around access, usage and participation in the PAN ecosystem, not empty complexity. Token activity and launch details can be published transparently through the Pons listing." align="center" /></Reveal>
       <div className="home-token-layout">
         <Reveal className="home-token-visual">
           <div className="token-orb"><div><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><b>$PAN</b><small>ECOSYSTEM TOKEN</small></div><i className="token-ring token-ring-one" /><i className="token-ring token-ring-two" /></div>
@@ -279,15 +276,6 @@ export function HomePage() {
       </div>
     </section>
 
-    <section className="home-section home-whitepaper" id="whitepaper">
-      <Reveal>
-        <SectionHeading eyebrow="PAN WHITEPAPER" title="Read the full PAN vision." copy="Explore how PAN is being built for Robinhood Chain, how $PAN connects to product usage, why Pons is the chosen launchpad and how the platform will continue to grow." align="center" />
-        <div className="home-whitepaper-actions">
-          {whitepaperUrl ? <a className="home-primary-cta" href={whitepaperUrl} target="_blank" rel="noreferrer">Open the whitepaper<FileText /></a> : <span className="whitepaper-coming-soon"><FileText />Whitepaper link coming soon</span>}
-        </div>
-      </Reveal>
-    </section>
-
     <section className="home-final-cta">
       <div className="final-cta-glow" />
       <Reveal><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><span>PROJECT AGENT NETWORK</span><h2>Your next Robinhood Chain project starts with a conversation.</h2><p>Bring the idea. PAN helps turn it into something people can see, understand and remember.</p><div><Link className="home-primary-cta" to="/register">Start building with PAN<ArrowRight /></Link><Link className="home-secondary-cta" to="/login">Sign in</Link></div></Reveal>
@@ -295,7 +283,7 @@ export function HomePage() {
 
     <footer className="home-footer">
       <div><Link className="home-brand" to="/"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><span>PAN.AI</span></Link><p>The Robinhood Chain project agent.</p></div>
-      <div className="home-footer-links"><button onClick={() => scrollToSection("why-pan")}>Why PAN</button><button onClick={() => scrollToSection("tokenomics")}>Tokenomics</button><button onClick={() => scrollToSection("roadmap")}>Roadmap</button><button onClick={() => scrollToSection("whitepaper")}>Whitepaper</button></div>
+      <div className="home-footer-links"><button onClick={() => scrollToSection("why-pan")}>Why PAN</button><button onClick={() => scrollToSection("tokenomics")}>Tokenomics</button><button onClick={() => scrollToSection("roadmap")}>Roadmap</button></div>
       <SocialLinks compact />
       <small>© {new Date().getFullYear()} PAN.AI. Built for Robinhood Chain.</small>
     </footer>
