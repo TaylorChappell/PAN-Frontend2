@@ -1,5 +1,27 @@
 {
+  "name": "pan-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
   "scripts": {
-    "build": "vite build"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "eslint ."
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-router-dom": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "latest",
+    "eslint-plugin-react-hooks": "latest",
+    "eslint-plugin-react-refresh": "latest",
+    "globals": "latest"
   }
 }
