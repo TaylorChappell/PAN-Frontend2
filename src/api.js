@@ -74,12 +74,16 @@ const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolv
 async function waitForAiRun(run) {
   const id = run?.id || run?.runId;
   if (!id) throw new ApiError("PAN did not return an AI run id.");
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  const startedAt = Date.now();
+  for (let attempt = 0; attempt < 180; attempt += 1) {
     const result = await api(`/api/ai/runs/${encodeURIComponent(id)}`);
     const status = result?.run?.status || result?.status;
     if (status === "succeeded") return result;
     if (status === "failed" || status === "cancelled") throw new ApiError(result?.run?.errorMessage || result?.error || `AI run ${status}.`);
-    await wait(1_500);
+
+    const elapsed = Date.now() - startedAt;
+    const delay = elapsed < 3_000 ? 250 : elapsed < 10_000 ? 500 : 1_000;
+    await wait(delay);
   }
   throw new ApiError("PAN is still working. Refresh the project shortly to see the result.", 202);
 }
