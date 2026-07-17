@@ -86,6 +86,7 @@ export const endpoints = {
     get: (id) => api(`/api/projects/${encodeURIComponent(id)}`),
     create: (payload) => api("/api/projects", { method: "POST", body: json(payload) }),
     update: (id, payload) => api(`/api/projects/${encodeURIComponent(id)}`, { method: "PATCH", body: json(payload) }),
+    remove: (id) => api(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" }),
     message: (id, payload) => api(`/api/projects/${encodeURIComponent(id)}/messages`, { method: "POST", body: json(payload) }),
     launch: (id, payload) => api(`/api/projects/${encodeURIComponent(id)}/launch`, { method: "POST", body: json(payload) }),
     claimFees: (id) => api(`/api/projects/${encodeURIComponent(id)}/creator-fees/claim`, { method: "POST" }),
@@ -100,6 +101,7 @@ export const endpoints = {
   },
   wallets: {
     list: () => api("/api/wallets"),
+    provision: () => api("/api/wallets/provision", { method: "POST" }),
     withdraw: (payload) => api("/api/wallets/withdrawals", { method: "POST", body: json(payload) }),
     connectChallenge: (payload) => api("/api/wallet-connections/challenge", { method: "POST", body: json(payload) }),
     connectVerify: (payload) => api("/api/wallet-connections/verify", { method: "POST", body: json(payload) }),

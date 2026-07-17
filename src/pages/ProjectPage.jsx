@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { ArrowUpRight, Check, Coins, Earth, Image as ImageIcon, LoaderCircle, MessageSquare, Paperclip, Rocket, Send, Sparkles, Upload, Wallet } from "lucide-react";
+import { ArrowUpRight, Coins, Earth, Image as ImageIcon, LoaderCircle, MessageSquare, Paperclip, Rocket, Send, Sparkles, Upload, Wallet, X } from "lucide-react";
 import { endpoints } from "../api";
 import { Button, Modal, Notice, Skeleton, money } from "../components/UI";
 
@@ -39,13 +39,16 @@ export function ProjectPage() {
   const [saving, setSaving] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [message, setMessage] = useState("");
+  const [attachments, setAttachments] = useState([]);
   const [error, setError] = useState("");
   const [launchOpen, setLaunchOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
   const [imagePrompt, setImagePrompt] = useState("");
   const [launch, setLaunch] = useState({ devBuyEth: "0", maxFeeEth: "", walletMode: "account", privateKey: "", acknowledge: false });
   const saveTimer = useRef(null);
-  const fileInput = useRef(null);
+  const coinImageInput = useRef(null);
+  const chatImageInput = useRef(null);
+  const messageInput = useRef(null);
   const feedRef = useRef(null);
 
   useEffect(() => {
@@ -55,6 +58,13 @@ export function ProjectPage() {
   }, [projectId]);
 
   useEffect(() => { feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: "smooth" }); }, [project.messages, thinking]);
+  useEffect(() => {
+    const input = messageInput.current;
+    if (!input) return;
+    input.style.height = "0px";
+    input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
+    input.style.overflowY = input.scrollHeight > 180 ? "auto" : "hidden";
+  }, [message]);
 
   const required = useMemo(() => ({ name: Boolean(project.coinName.trim()), ticker: Boolean(project.ticker.trim()), image: Boolean(project.imageUrl) }), [project]);
   const complete = Object.values(required).filter(Boolean).length;
@@ -83,7 +93,7 @@ export function ProjectPage() {
     }, 550);
   };
 
-  const readImage = (file) => {
+  const readCoinImage = (file) => {
     if (!file) return;
     if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) return setError("Use a PNG, JPG, WebP or GIF image.");
     if (file.size > 8 * 1024 * 1024) return setError("Coin images must be under 8 MB.");
@@ -92,19 +102,46 @@ export function ProjectPage() {
     reader.readAsDataURL(file);
   };
 
+  const addChatImages = async (files) => {
+    const incoming = Array.from(files || []).filter((file) => file?.type?.startsWith("image/"));
+    if (!incoming.length) return;
+    if (attachments.length + incoming.length > 6) return setError("You can attach up to 6 images to one message.");
+    const invalid = incoming.find((file) => !/^image\/(png|jpeg|webp|gif)$/.test(file.type) || file.size > 8 * 1024 * 1024);
+    if (invalid) return setError("Use PNG, JPG, WebP, or GIF images under 8 MB each.");
+    const read = (file) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ id: crypto.randomUUID(), fileName: file.name || `pasted-image-${Date.now()}.png`, mimeType: file.type, size: file.size, dataUrl: reader.result });
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    try { const loaded = await Promise.all(incoming.map(read)); setAttachments((old) => [...old, ...loaded]); }
+    catch { setError("One of the images could not be read."); }
+  };
+
+  const handlePaste = (event) => {
+    const images = Array.from(event.clipboardData?.items || []).filter((item) => item.type.startsWith("image/")).map((item) => item.getAsFile()).filter(Boolean);
+    if (images.length) { event.preventDefault(); addChatImages(images); }
+  };
+
   const send = async (text = message) => {
-    const clean = text.trim(); if (!clean || thinking) return;
-    setError(""); setMessage("");
-    const userMessage = { id: crypto.randomUUID(), role: "user", content: clean };
+    const clean = text.trim(); if ((!clean && !attachments.length) || thinking) return;
+    const outgoingAttachments = attachments;
+    setError(""); setMessage(""); setAttachments([]);
+    const userMessage = { id: crypto.randomUUID(), role: "user", content: clean, attachments: outgoingAttachments };
     setProject((old) => ({ ...old, messages: [...old.messages, userMessage] })); setThinking(true);
     try {
       const id = await ensureProject();
-      const data = await endpoints.projects.message(id, { message: clean, performance: project.performance });
+      const data = await endpoints.projects.message(id, { message: clean, performance: project.performance, attachments: outgoingAttachments.map(({ fileName, mimeType, size, dataUrl }) => ({ fileName, mimeType, size, dataUrl })) });
       const assistantMessage = { id: data?.id || crypto.randomUUID(), role: "assistant", content: extractReply(data) };
       setProject((old) => ({ ...old, ...(data?.project ? normalizeProject(data.project) : {}), messages: [...old.messages, assistantMessage] }));
       reload();
-    } catch (e) { setError(e.message); }
+    } catch (e) { setError(e.message); setAttachments(outgoingAttachments); }
     finally { setThinking(false); }
+  };
+
+  const openWebsiteStudio = async () => {
+    try { navigate(`/projects/${await ensureProject()}/website`); }
+    catch (e) { setError(e.message); }
   };
 
   const generateImage = async () => {
@@ -138,19 +175,19 @@ export function ProjectPage() {
   return (
     <div className="project-page">
       <section className="chat-column">
-        <header className="project-header"><div><h1>{project.coinName || project.name || "Untitled coin"}</h1><span className={`status-pill ${launched ? "live" : "draft"}`}>{launched ? "Live" : project.status || "Draft"}</span>{saving ? <small><LoaderCircle className="spin" />Saving</small> : null}</div><label>Performance<select value={project.performance} onChange={(e) => persist({ performance: e.target.value })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="extra_high">Extra high</option></select></label></header>
+        <header className="project-header"><div><h1>{project.coinName || project.name || "Untitled coin"}</h1><span className={`status-pill ${launched ? "live" : "draft"}`}>{launched ? "Live" : project.status || "Draft"}</span>{saving ? <small><LoaderCircle className="spin" />Saving</small> : null}</div><button className="studio-link" onClick={openWebsiteStudio}><Earth />Website studio</button></header>
         {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
         <div className="chat-feed" ref={feedRef}>
-          {!project.messages.length ? <><div className="pan-message"><span className="pan-avatar"><i /></span><div><small>PAN · PROJECT AGENT</small><p>Tell me what you want to create. I’ll ask whenever an important detail is unclear.</p><p>To launch a coin, I’ll need its name, ticker and image. Website and X account are optional.</p></div></div><div className="suggestion-row"><button onClick={() => send("Help me shape the idea for my coin") }><MessageSquare />Shape my idea</button><button onClick={() => setImageOpen(true)}><Sparkles />Generate a logo</button><button onClick={() => send("Build a website for this coin") }><Earth />Build its website</button></div></> : null}
-          {project.messages.map((item) => item.role === "user" ? <div className="user-message" key={item.id}>{item.content || item.message}</div> : <div className="pan-message" key={item.id}><span className="pan-avatar"><i /></span><div><small>PAN · PROJECT AGENT</small><p>{item.content || item.message}</p></div></div>)}
+          {!project.messages.length ? <><div className="pan-message"><span className="pan-avatar"><i /></span><div><small>PAN · PROJECT AGENT</small><p>Tell me what you want to create. I’ll ask whenever an important detail is unclear.</p><p>To launch a coin, I’ll need its name, ticker and image. Website and X account are optional.</p></div></div><div className="suggestion-row"><button onClick={() => send("Help me shape the idea for my coin") }><MessageSquare />Shape my idea</button><button onClick={() => setImageOpen(true)}><Sparkles />Generate a logo</button><button onClick={openWebsiteStudio}><Earth />Build its website</button></div></> : null}
+          {project.messages.map((item) => item.role === "user" ? <div className="user-message" key={item.id}>{item.content || item.message ? <p>{item.content || item.message}</p> : null}{item.attachments?.length ? <div className="message-images">{item.attachments.map((image, index) => <img key={image.id || image.url || index} src={image.url || image.dataUrl} alt={image.fileName || "Chat attachment"} />)}</div> : null}</div> : <div className="pan-message" key={item.id}><span className="pan-avatar"><i /></span><div><small>PAN · PROJECT AGENT</small><p>{item.content || item.message}</p></div></div>)}
           {thinking ? <div className="pan-message thinking"><span className="pan-avatar"><i /></span><div><small>PAN IS THINKING</small><div className="thinking-dots"><i/><i/><i/></div></div></div> : null}
         </div>
-        <div className="composer"><textarea aria-label="Message PAN" placeholder="Message PAN…" value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} /><div><span><button aria-label="Attach file" onClick={() => fileInput.current?.click()}><Paperclip /></button><button aria-label="Generate image" onClick={() => setImageOpen(true)}><ImageIcon /></button><input ref={fileInput} hidden type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => readImage(e.target.files?.[0])}/></span><button className="send-button" disabled={!message.trim() || thinking} onClick={() => send()} aria-label="Send"><Send /></button></div><small>PAN asks before acting whenever important details are unclear.</small></div>
+        <div className="composer" onPaste={handlePaste}>{attachments.length ? <div className="attachment-strip">{attachments.map((image) => <div key={image.id}><img src={image.dataUrl} alt={image.fileName} /><button aria-label={`Remove ${image.fileName}`} onClick={() => setAttachments((old) => old.filter((item) => item.id !== image.id))}><X /></button><span>{image.fileName}</span></div>)}</div> : null}<textarea ref={messageInput} rows="1" aria-label="Message PAN" placeholder="Message PAN…" value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} /><div><span><button aria-label="Attach images" onClick={() => chatImageInput.current?.click()}><Paperclip /></button><button aria-label="Generate image" onClick={() => setImageOpen(true)}><ImageIcon /></button><input ref={chatImageInput} hidden multiple type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { addChatImages(e.target.files); e.target.value = ""; }}/></span><span className="composer-actions"><label>Performance<select aria-label="Performance" value={project.performance} onChange={(e) => persist({ performance: e.target.value })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="extra_high">Extra high</option></select></label><button className="send-button" disabled={(!message.trim() && !attachments.length) || thinking} onClick={() => send()} aria-label="Send"><Send /></button></span></div></div>
       </section>
       <aside className="details-panel">
         {launched ? <CoinStats project={project} /> : <><div className="panel-title"><div><p>PROJECT OBJECT</p><h2>Coin details</h2></div><span className="completion">{complete}/3</span></div>
-          <button className={`image-upload ${project.imageUrl ? "has-image" : ""}`} onClick={() => fileInput.current?.click()}>{project.imageUrl ? <img src={project.imageUrl} alt="Coin" /> : <><Upload /><strong>Upload coin image</strong><small>PNG, JPG, WebP or GIF · required</small></>}</button>
-          <div className="field-stack"><Field label="Name"><input value={project.coinName} onChange={(e) => persist({ coinName: e.target.value, name: e.target.value || "Untitled coin" })} placeholder="e.g. Neon Frog" /></Field><Field label="Ticker"><input maxLength="10" value={project.ticker} onChange={(e) => persist({ ticker: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") })} placeholder="e.g. NFRG" /></Field><Field label="Description" optional><textarea maxLength="256" value={project.description || ""} onChange={(e) => persist({ description: e.target.value })} placeholder="What is this coin about?" /></Field><label className="field"><span>Network</span><div className="static-field">◆ Robinhood Chain <Check /></div></label><Field label="Website" optional><input value={project.website || ""} onChange={(e) => persist({ website: e.target.value })} placeholder="https://coin.xyz" /></Field><Field label="X account" optional><input value={project.xAccount || ""} onChange={(e) => persist({ xAccount: e.target.value })} placeholder="@coin" /></Field><Field label="Telegram" optional><input value={project.telegram || ""} onChange={(e) => persist({ telegram: e.target.value })} placeholder="coincommunity" /></Field></div>
+          <button className={`image-upload ${project.imageUrl ? "has-image" : ""}`} onClick={() => coinImageInput.current?.click()}>{project.imageUrl ? <img src={project.imageUrl} alt="Coin" /> : <><Upload /><strong>Upload coin image</strong><small>PNG, JPG, WebP or GIF · required</small></>}</button><input ref={coinImageInput} hidden type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { readCoinImage(e.target.files?.[0]); e.target.value = ""; }}/>
+          <div className="field-stack"><Field label="Name"><input value={project.coinName} onChange={(e) => persist({ coinName: e.target.value, name: e.target.value || "Untitled coin" })} placeholder="e.g. Neon Frog" /></Field><Field label="Ticker"><input maxLength="10" value={project.ticker} onChange={(e) => persist({ ticker: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") })} placeholder="e.g. NFRG" /></Field><Field label="Description" optional><textarea maxLength="256" value={project.description || ""} onChange={(e) => persist({ description: e.target.value })} placeholder="What is this coin about?" /></Field><Field label="Website" optional><input value={project.website || ""} onChange={(e) => persist({ website: e.target.value })} placeholder="https://coin.xyz" /></Field><Field label="X account" optional><input value={project.xAccount || ""} onChange={(e) => persist({ xAccount: e.target.value })} placeholder="@coin" /></Field><Field label="Telegram" optional><input value={project.telegram || ""} onChange={(e) => persist({ telegram: e.target.value })} placeholder="coincommunity" /></Field></div>
           <div className="requirements">{Object.entries(required).map(([key, value]) => <span className={value ? "done" : ""} key={key}><i />{key === "name" ? "Name" : key === "ticker" ? "Ticker" : "Image"}</span>)}</div>
           <Button className="launch-button" disabled={complete !== 3} onClick={() => setLaunchOpen(true)}><Rocket />Launch coin</Button><small className="button-caption">{complete === 3 ? "Review launch funding and wallet" : "Complete the three required details"}</small></>}
       </aside>

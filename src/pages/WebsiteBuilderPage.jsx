@@ -16,7 +16,7 @@ function normalizeSite(data) {
 }
 
 export function WebsiteBuilderPage() {
-  const { siteId } = useParams(); const navigate = useNavigate();
+  const { projectId, siteId } = useParams(); const navigate = useNavigate();
   const [site, setSite] = useState(null); const [selected, setSelected] = useState("frontend/index.html");
   const [view, setView] = useState("preview"); const [prompt, setPrompt] = useState(""); const [loading, setLoading] = useState(true); const [running, setRunning] = useState(false); const [error, setError] = useState("");
   const [deployOpen, setDeployOpen] = useState(false); const [envOpen, setEnvOpen] = useState(false); const [envRows, setEnvRows] = useState([{ key: "", value: "", secret: true }]); const [github, setGithub] = useState(null); const [exporting, setExporting] = useState(false);
@@ -28,10 +28,13 @@ export function WebsiteBuilderPage() {
         ? (listResult.value?.sites || listResult.value?.items || (Array.isArray(listResult.value) ? listResult.value : []))
         : [];
       if (siteResult.status === "fulfilled" && siteResult.value) setSite(normalizeSite(siteResult.value));
-      else if (!siteId) setSite(normalizeSite(existing[0] || {}));
+      else if (!siteId) {
+        const projectSite = existing.find((item) => item.projectId === projectId || item.project?.id === projectId);
+        setSite(normalizeSite(projectSite || { projectId }));
+      }
       if (siteResult.status === "rejected") setError(siteResult.reason.message);
     }).finally(() => setLoading(false));
-  }, [siteId]);
+  }, [projectId, siteId]);
 
   useEffect(() => { if (deployOpen) endpoints.sites.githubStatus().then(setGithub).catch(() => setGithub({ connected: false })); }, [deployOpen]);
 
@@ -40,8 +43,8 @@ export function WebsiteBuilderPage() {
 
   const ensureSite = async () => {
     if (site?.id) return site.id;
-    const data = await endpoints.sites.create({ name: site?.name || "Untitled website", projectId: site?.projectId || null, template: "fullstack" });
-    const created = normalizeSite(data); setSite((old) => ({ ...old, ...created })); navigate(`/builder/${created.id}`, { replace: true }); return created.id;
+    const data = await endpoints.sites.create({ name: site?.name || "Untitled website", projectId, template: "fullstack" });
+    const created = normalizeSite(data); setSite((old) => ({ ...old, ...created })); navigate(`/projects/${projectId}/website/${created.id}`, { replace: true }); return created.id;
   };
 
   const run = async () => {
@@ -60,7 +63,7 @@ export function WebsiteBuilderPage() {
   if (!site) return <EmptyState title="Website unavailable" text={error || "PAN could not load this website."} />;
 
   return <div className="builder-page">
-    <header className="builder-header"><div><p>WEBSITE STUDIO</p><input aria-label="Website name" value={site.name} onChange={(e) => setSite({ ...site, name: e.target.value })}/><span className={`status-pill ${site.status === "published" ? "live" : "draft"}`}>{site.status}</span></div><div><Button variant="ghost" onClick={() => setEnvOpen(true)}><KeyRound/>Environment</Button><a className="button button-ghost" href={site.id ? endpoints.sites.downloadUrl(site.id) : "#"} onClick={(e) => !site.id && e.preventDefault()}><Download/>ZIP</a><Button onClick={() => setDeployOpen(true)}><Rocket/>Export & deploy</Button></div></header>
+    <header className="builder-header"><div><p>PROJECT WEBSITE</p><input aria-label="Website name" value={site.name} onChange={(e) => setSite({ ...site, name: e.target.value })}/><span className={`status-pill ${site.status === "published" ? "live" : "draft"}`}>{site.status}</span></div><div><Button variant="ghost" onClick={() => navigate(`/projects/${projectId}`)}>Back to project</Button><Button variant="ghost" onClick={() => setEnvOpen(true)}><KeyRound/>Environment</Button><a className="button button-ghost" href={site.id ? endpoints.sites.downloadUrl(site.id) : "#"} onClick={(e) => !site.id && e.preventDefault()}><Download/>ZIP</a><Button onClick={() => setDeployOpen(true)}><Rocket/>Export & deploy</Button></div></header>
     {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
     <div className="builder-workspace">
       <aside className="builder-chat"><div className="builder-agent"><span><SparkIcon/></span><div><small>PAN BUILDER</small><p>I can build the frontend and a limited backend. Tell me what should change and I’ll update the files and preview.</p></div></div><div className="builder-history">{site.runs?.map((runItem) => <div key={runItem.id}><small>{runItem.status}</small><p>{runItem.prompt}</p></div>)}</div><div className="builder-compose"><textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Build a token landing page with live stats…" onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run(); }}/><Button loading={running} disabled={!prompt.trim()} onClick={run}><Play/>Build</Button><small>Ctrl/⌘ + Enter to run</small></div></aside>

@@ -31,8 +31,10 @@ function App() {
       <Route element={<Protected><AppShell /></Protected>}>
         <Route index element={<ProjectPage />} />
         <Route path="projects/:projectId" element={<ProjectPage />} />
-        <Route path="builder" element={<WebsiteBuilderPage />} />
-        <Route path="builder/:siteId" element={<WebsiteBuilderPage />} />
+        <Route path="projects/:projectId/website" element={<WebsiteBuilderPage />} />
+        <Route path="projects/:projectId/website/:siteId" element={<WebsiteBuilderPage />} />
+        <Route path="builder" element={<Navigate to="/" replace />} />
+        <Route path="builder/:siteId" element={<Navigate to="/" replace />} />
         <Route path="credits" element={<CreditsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="support" element={<SupportPage />} />
