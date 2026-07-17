@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { ArrowUpRight, Coins, Earth, Image as ImageIcon, LoaderCircle, MessageSquare, Paperclip, Rocket, Send, Sparkles, Upload, Wallet, X } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Coins, Earth, Image as ImageIcon, LoaderCircle, MessageSquare, Paperclip, Rocket, Send, Sparkles, Upload, Wallet, X } from "lucide-react";
 import { endpoints, mediaUrl } from "../api";
 import { Button, Modal, Notice, Skeleton, money } from "../components/UI";
 import { InlineMarkdown } from "../components/InlineMarkdown";
@@ -40,6 +40,30 @@ function projectFields(data) {
 
 function Field({ label, optional, children }) {
   return <label className="field"><span>{label}{optional ? <i>Optional</i> : <b>Required</b>}</span>{children}</label>;
+}
+
+const socialRules = {
+  x: { hosts: ["x.com", "www.x.com", "twitter.com", "www.twitter.com"], base: "https://x.com", maximum: 15, label: "X account" },
+  telegram: { hosts: ["t.me", "www.t.me", "telegram.me", "www.telegram.me"], base: "https://t.me", maximum: 32, label: "Telegram" },
+};
+
+function resolveSocialLink(rawValue, type) {
+  const value = String(rawValue || "").trim();
+  if (!value) return { url: "", error: "" };
+  const rule = socialRules[type];
+  let handle;
+  const looksLikeUrl = /^https?:\/\//i.test(value) || /^(?:www\.)?(?:x\.com|twitter\.com|t\.me|telegram\.me)\//i.test(value);
+  if (looksLikeUrl) {
+    try {
+      const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+      if (!rule.hosts.includes(url.hostname.toLowerCase())) return { url: "", error: `${rule.label} must use ${rule.hosts[0]}.` };
+      handle = url.pathname.split("/").filter(Boolean)[0] || "";
+    } catch { return { url: "", error: `${rule.label} link is invalid.` }; }
+  } else {
+    handle = value.replace(/^@/, "").replace(/^\/+|\/+$/g, "");
+  }
+  if (!new RegExp(`^[A-Za-z0-9_]{1,${rule.maximum}}$`).test(handle)) return { url: "", error: `${rule.label} handle is invalid.` };
+  return { url: `${rule.base}/${handle}`, error: "" };
 }
 
 export function ProjectPage() {
@@ -98,6 +122,8 @@ export function ProjectPage() {
 
   const required = useMemo(() => ({ name: Boolean(project.coinName.trim()), ticker: Boolean(project.ticker.trim()), image: Boolean(project.imageUrl) }), [project]);
   const complete = Object.values(required).filter(Boolean).length;
+  const resolvedX = useMemo(() => resolveSocialLink(project.xAccount, "x"), [project.xAccount]);
+  const resolvedTelegram = useMemo(() => resolveSocialLink(project.telegram, "telegram"), [project.telegram]);
   const launched = project.status === "live" || project.status === "launched" || Boolean(project.contractAddress || project.tokenAddress);
 
   const ensureProject = async () => {
@@ -130,7 +156,7 @@ export function ProjectPage() {
     setSaving(true); setError("");
     try {
       const id = await ensureProject();
-      const result = await endpoints.assets.upload(file, { projectId: id, kind: "logo", visibility: "private" });
+      const result = await endpoints.assets.upload(file, { projectId: id, kind: "logo", visibility: "public" });
       await persist({ imageUrl: result.url, imageFileName: file.name });
     } catch (e) { setError(e.message); }
     finally { setSaving(false); }
@@ -245,7 +271,7 @@ export function ProjectPage() {
       <aside className="details-panel">
         {launched ? <CoinStats project={project} /> : <><div className="panel-title"><div><p>PROJECT OBJECT</p><h2>Coin details</h2></div><span className="completion">{complete}/3</span></div>
           <button className={`image-upload ${project.imageUrl ? "has-image" : ""}`} onClick={() => coinImageInput.current?.click()}>{project.imageUrl ? <img src={mediaUrl(project.imageUrl)} alt="Coin" /> : <><Upload /><strong>Upload coin image</strong><small>PNG, JPG, WebP or GIF · required</small></>}</button><input ref={coinImageInput} hidden type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { readCoinImage(e.target.files?.[0]); e.target.value = ""; }}/>
-          <div className="field-stack"><Field label="Name"><input value={project.coinName} onChange={(e) => persist({ coinName: e.target.value, name: e.target.value || "Untitled coin" })} placeholder="e.g. Neon Frog" /></Field><Field label="Ticker"><input maxLength="10" value={project.ticker} onChange={(e) => persist({ ticker: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") })} placeholder="e.g. NFRG" /></Field><Field label="Description" optional><textarea maxLength="256" value={project.description || ""} onChange={(e) => persist({ description: e.target.value })} placeholder="What is this coin about?" /></Field><Field label="Website" optional><input value={project.website || ""} onChange={(e) => persist({ website: e.target.value })} placeholder="https://coin.xyz" /></Field><Field label="X account" optional><input value={project.xAccount || ""} onChange={(e) => persist({ xAccount: e.target.value })} placeholder="@coin" /></Field><Field label="Telegram" optional><input value={project.telegram || ""} onChange={(e) => persist({ telegram: e.target.value })} placeholder="coincommunity" /></Field></div>
+          <div className="field-stack"><Field label="Name"><input value={project.coinName} onChange={(e) => persist({ coinName: e.target.value, name: e.target.value || "Untitled coin" })} placeholder="e.g. Neon Frog" /></Field><Field label="Ticker"><input maxLength="10" value={project.ticker} onChange={(e) => persist({ ticker: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") })} placeholder="e.g. NFRG" /></Field><Field label="Description" optional><textarea maxLength="256" value={project.description || ""} onChange={(e) => persist({ description: e.target.value })} placeholder="What is this coin about?" /></Field><Field label="Website" optional><input value={project.website || ""} onChange={(e) => persist({ website: e.target.value })} placeholder="https://coin.xyz" /></Field><Field label="X account" optional><input value={project.xAccount || ""} onChange={(e) => persist({ xAccount: e.target.value })} onBlur={() => { if (resolvedX.url && project.xAccount !== resolvedX.url) persist({ xAccount: resolvedX.url }); }} placeholder="@PanAiApp or x.com/PanAiApp" />{project.xAccount ? <small className={`resolved-social ${resolvedX.url ? "valid" : "invalid"}`}>{resolvedX.url ? <><CheckCircle2/><a href={resolvedX.url} target="_blank" rel="noreferrer">{resolvedX.url}</a></> : resolvedX.error}</small> : null}</Field><Field label="Telegram" optional><input value={project.telegram || ""} onChange={(e) => persist({ telegram: e.target.value })} onBlur={() => { if (resolvedTelegram.url && project.telegram !== resolvedTelegram.url) persist({ telegram: resolvedTelegram.url }); }} placeholder="@coincommunity or t.me/coincommunity" />{project.telegram ? <small className={`resolved-social ${resolvedTelegram.url ? "valid" : "invalid"}`}>{resolvedTelegram.url ? <><CheckCircle2/><a href={resolvedTelegram.url} target="_blank" rel="noreferrer">{resolvedTelegram.url}</a></> : resolvedTelegram.error}</small> : null}</Field></div>
           <div className="requirements">{Object.entries(required).map(([key, value]) => <span className={value ? "done" : ""} key={key}><i />{key === "name" ? "Name" : key === "ticker" ? "Ticker" : "Image"}</span>)}</div>
           <Button className="launch-button" disabled={complete !== 3} onClick={() => setLaunchOpen(true)}><Rocket />Launch coin</Button><small className="button-caption">{complete === 3 ? "Review launch funding and wallet" : "Complete the three required details"}</small></>}
       </aside>

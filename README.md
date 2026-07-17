@@ -78,7 +78,7 @@ The backend must allow the exact GitHub Pages origin. An origin does not include
 
 ```env
 FRONTEND_URL=https://USERNAME.github.io/REPOSITORY
-CORS_ORIGINS=https://USERNAME.github.io
+FRONTEND_ORIGIN=https://USERNAME.github.io
 ```
 
 For cookie-based cross-site authentication, production cookies must use:

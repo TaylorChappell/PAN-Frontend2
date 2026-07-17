@@ -22,10 +22,12 @@ export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const studioMode = /^\/projects\/[^/]+\/website(?:\/|$)/.test(location.pathname);
+  const freeCreditsBannerKey = `pan_free_credits_banner_seen:${user?.id || user?.email || "account"}`;
   const [projects, setProjects] = useState([]);
   const [account, setAccount] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [bannerClosed, setBannerClosed] = useState(sessionStorage.getItem("pan_credit_banner_closed") === "1");
+  const [freeCreditsBannerSeen, setFreeCreditsBannerSeen] = useState(localStorage.getItem(freeCreditsBannerKey) === "1");
   const [creating, setCreating] = useState(false);
   const [projectMenu, setProjectMenu] = useState(null);
   const [projectAction, setProjectAction] = useState(null);
@@ -87,11 +89,22 @@ export function AppShell() {
   const operationsWallet = account?.wallets?.find((wallet) => wallet.role === "operations");
   const ethBalance = operationsWallet?.ethBalance ?? account?.ethBalance ?? account?.wallet?.ethBalance ?? user?.ethBalance ?? 0;
   const banner = useMemo(() => {
+    if (!freeCreditsBannerSeen) return { kind: "free", text: "New to PAN.AI?", cta: "Get free credits here" };
     if (bannerClosed || creditBalance > 20) return null;
     return creditBalance <= 0
-      ? { text: "You’re out of PAN credits.", cta: "Buy credits to keep building" }
-      : { text: `You’re running low with ${creditBalance.toLocaleString()} credits left.`, cta: "Top up credits" };
-  }, [bannerClosed, creditBalance]);
+      ? { kind: "balance", text: "You’re out of PAN credits.", cta: "Buy credits to keep building" }
+      : { kind: "balance", text: `You’re running low with ${creditBalance.toLocaleString()} credits left.`, cta: "Top up credits" };
+  }, [bannerClosed, creditBalance, freeCreditsBannerSeen]);
+
+  const dismissBanner = () => {
+    if (banner?.kind === "free") {
+      setFreeCreditsBannerSeen(true);
+      localStorage.setItem(freeCreditsBannerKey, "1");
+      return;
+    }
+    setBannerClosed(true);
+    sessionStorage.setItem("pan_credit_banner_closed", "1");
+  };
 
   const name = user?.name || user?.username || user?.email || "PAN user";
   const avatar = user?.image || user?.avatarUrl || user?.picture;
@@ -160,7 +173,7 @@ export function AppShell() {
         </div>
       </aside>
       <main className="app-main">
-        {banner ? <div className="credit-banner"><Coins size={17} /><span>{banner.text}</span><Link to="/credits">{banner.cta}</Link><button onClick={() => { setBannerClosed(true); sessionStorage.setItem("pan_credit_banner_closed", "1"); }}><X size={16} /></button></div> : null}
+        {banner ? <div className="credit-banner"><Coins size={17} /><span>{banner.text}</span><Link to="/credits" onClick={dismissBanner}>{banner.cta}</Link><button onClick={dismissBanner}><X size={16} /></button></div> : null}
         <Outlet context={{ projects, setProjects, account, reload }} />
       </main>
       {projectMenu ? <><button className="context-menu-backdrop" aria-label="Close project menu" onClick={() => setProjectMenu(null)} /><div className="project-context-menu" style={{ left: Math.min(projectMenu.x, window.innerWidth - 180), top: Math.min(projectMenu.y, window.innerHeight - 110) }}><button onClick={() => openProjectAction("rename", projectMenu.project)}><Pencil />Rename</button><button className="danger" onClick={() => openProjectAction("delete", projectMenu.project)}><Trash2 />Delete</button></div></> : null}

@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Check, Coins, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, Sparkles } from "lucide-react";
 import { endpoints } from "../api";
 import { useAuth } from "../auth";
 import { Button, Notice } from "../components/UI";
 
-function AuthLayout({ eyebrow, title, copy, children }) {
+function AuthLayout({ eyebrow, title, copy, actions, children }) {
   return (
     <main className="auth-page">
       <section className="auth-art">
         <Link className="brand auth-brand" to="/"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" />PAN.AI</Link>
-        <div className="auth-pitch"><span className="eyebrow"><Sparkles size={14} />{eyebrow}</span><h1>{title}</h1><p>{copy}</p>
-          <div className="auth-proof"><ShieldCheck /><div><strong>Ask first. Build with confidence.</strong><small>PAN never guesses when important project details are missing.</small></div></div>
-        </div>
+        <div className="auth-pitch"><span className="eyebrow"><Sparkles size={14} />{eyebrow}</span><h1>{title}</h1><p>{copy}</p>{actions ? <div className="auth-social-actions">{actions}</div> : null}</div>
         <small>PAN.AI tools for the Robinhood Chain ecosystem.</small>
       </section>
       <section className="auth-form-wrap">{children}</section>
@@ -46,15 +44,16 @@ export function LoginPage() {
   };
   const google = async () => { setGoogleLoading(true); setError(""); try { const data = await endpoints.auth.google(); if (!data?.url) throw new Error("Google sign-in did not return an authorization URL."); window.location.assign(data.url); } catch (requestError) { setError(requestError.message); setGoogleLoading(false); } };
 
-  const xUrl = import.meta.env.VITE_X_URL || "https://x.com";
+  const xUrl = import.meta.env.VITE_X_URL || "https://x.com/PanAIApp";
   const ponsUrl = import.meta.env.VITE_PONS_TOKEN_URL || "https://pons.family";
-  return <AuthLayout eyebrow="Welcome back" title="Build the next coin people remember." copy="Plan, design, launch and monitor your Robinhood Chain project from one focused workspace.">
+  const socialActions = <><a className="auth-social-button auth-social-x" href={xUrl} target="_blank" rel="noreferrer"><img src={`${import.meta.env.BASE_URL}X.png`} alt="" />X</a><a className="auth-social-button auth-social-pan" href={ponsUrl} target="_blank" rel="noreferrer"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" />GET $PAN</a></>;
+  return <AuthLayout eyebrow="Welcome back" title="Build the next coin people remember." copy="Plan, design, launch and monitor your Robinhood Chain project from one focused workspace." actions={socialActions}>
     <form className="auth-form" onSubmit={submit}><div className="auth-form-heading"><h2>Sign in to PAN.AI</h2><p>Continue your projects where you left off.</p></div>
       {error ? <Notice>{error}</Notice> : null}<GoogleButton loading={googleLoading} onClick={google}/><div className="or"><span>or continue with email</span></div>
       <Field label="Email address" icon={Mail} type="email" autoComplete="email" required value={values.email} onChange={(e) => setValues({ ...values, email: e.target.value })} placeholder="you@example.com" />
       <Field label="Password" icon={LockKeyhole} type="password" autoComplete="current-password" required value={values.password} onChange={(e) => setValues({ ...values, password: e.target.value })} placeholder="Your password" />
       <div className="form-split"><label className="checkbox"><input type="checkbox" checked={values.remember} onChange={(e) => setValues({ ...values, remember: e.target.checked })}/><span />Remember me</label><Link to="/forgot-password">Forgot password?</Link></div>
-      <Button type="submit" loading={loading}>Sign in</Button><p className="auth-switch">New to PAN.AI? <Link to="/register">Create an account</Link></p><div className="login-socials"><a href={xUrl} target="_blank" rel="noreferrer"><span>𝕏</span>Twitter</a><a href={ponsUrl} target="_blank" rel="noreferrer"><Coins/>Get PAN</a></div>
+      <Button type="submit" loading={loading}>Sign in</Button><p className="auth-switch">New to PAN.AI? <Link to="/register">Create an account</Link></p>
     </form>
   </AuthLayout>;
 }
