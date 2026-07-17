@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   Bot,
-  BrainCircuit,
   ChevronRight,
   CircleDollarSign,
   Coins,
@@ -17,7 +16,6 @@ import {
   MessageSquareText,
   Network,
   Rocket,
-  ShieldCheck,
   WandSparkles,
   X as CloseIcon,
   Zap,
@@ -26,7 +24,7 @@ import {
 
 const featureCards = [
   {
-    icon: BrainCircuit,
+    icon: Bot,
     eyebrow: "CHAIN-NATIVE INTELLIGENCE",
     title: "An AI built around Robinhood Chain",
     copy: "PAN focuses on the ecosystem you are actually launching into, helping with the coin, positioning, creative direction and launch decisions from one conversation.",
@@ -52,10 +50,26 @@ const featureCards = [
 ];
 
 const roadmap = [
-  ["NOW", "Launch workspace", "AI project planning, coin creation, visual generation, website building and Pons launch support."],
-  ["NEXT", "Smarter market intelligence", "Deeper Robinhood Chain awareness, stronger project guidance and more useful live-market context."],
-  ["EXPANDING", "More creation tools", "Broader branding, content and growth capabilities that continue after the coin goes live."],
-  ["FUTURE", "Persistent project operator", "PAN becomes an increasingly capable agent for building, running and growing on-chain projects."],
+  {
+    phase: "LIVE NOW",
+    title: "Launch workspace",
+    copy: "PAN already has a deep understanding of Robinhood Chain, how launches behave and what helps coins stand out. It combines user feedback and questions with its own research tools so its knowledge keeps expanding. PAN can already plan launches, create coin visuals and build complete frontend and backend websites for projects.",
+  },
+  {
+    phase: "NEXT",
+    title: "Airdrops and marketing",
+    copy: "PAN will gift free credits and $PAN tokens to people who support the project and use @PanAiApp on X. Campaigns will reward useful posts, launch content and genuine community participation.",
+  },
+  {
+    phase: "GROWING",
+    title: "Smarter market intelligence",
+    copy: "We plan to hire specialists to train PAN specifically on Robinhood Chain, launch strategies, positioning and the tactics that help coins succeed. We will also make its responses faster, clearer and more useful as the model and research systems improve.",
+  },
+  {
+    phase: "EXPANDING",
+    title: "More creation tools",
+    copy: "PAN will gain tools to manage social media accounts for each coin and create complete social media and marketing plans around the project's exact niche and needs. More launch, content and growth tools will continue to be added.",
+  },
 ];
 
 function scrollToSection(id) {
@@ -133,6 +147,7 @@ function HeroVisual() {
 
 export function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openRoadmap, setOpenRoadmap] = useState(0);
   const ponsUrl = import.meta.env.VITE_PONS_TOKEN_URL || "https://pons.family";
   const whitepaperUrl = import.meta.env.VITE_WHITEPAPER_URL;
 
@@ -237,10 +252,9 @@ export function HomePage() {
           <span className="token-flow token-flow-three">Expansion<i /></span>
         </Reveal>
         <div className="home-token-cards">
-          <Reveal className="delay-1"><article><span><CircleDollarSign /></span><div><small>CORE UTILITY</small><h3>Credits used for AI</h3><p>$PAN can be used to fund PAN credits, connecting the token directly to usage of the product.</p></div></article></Reveal>
+          <Reveal className="delay-1"><article><span><CircleDollarSign /></span><div><small>CORE UTILITY</small><h3>Credits used for AI</h3><p>$PAN can be used to fund PAN credits. Whenever a user purchases credits, PAN tokens are burned or bought back, connecting product usage directly to the token.</p></div></article></Reveal>
           <Reveal className="delay-2"><article><span><Coins /></span><div><small>COMMUNITY</small><h3>Rewards participation</h3><p>Community campaigns can reward useful attention, content and participation with $PAN, credits or both.</p></div></article></Reveal>
-          <Reveal className="delay-3"><article><span><Rocket /></span><div><small>LONG-TERM UTILITY</small><h3>More value as PAN expands</h3><p>As new capabilities are added, the token can support a wider set of creation, launch and project-management functions.</p></div></article></Reveal>
-          <Reveal className="delay-4"><article><span><ShieldCheck /></span><div><small>TRANSPARENCY</small><h3>Verify the live details</h3><p>Contract, market and allocation information should be checked against the official Pons listing and whitepaper.</p></div></article></Reveal>
+          <Reveal className="delay-3"><article><span><Rocket /></span><div><small>LONG-TERM UTILITY</small><h3>More value as PAN expands</h3><p>As new capabilities are added, the token can support a wider set of creation, launch and project management functions.</p></div></article></Reveal>
         </div>
       </div>
     </section>
@@ -248,15 +262,28 @@ export function HomePage() {
     <section className="home-section home-roadmap" id="roadmap">
       <Reveal><SectionHeading eyebrow="THE DIRECTION" title="PAN is only getting started." copy="The product will continue to expand around a simple goal: make it dramatically easier to create and operate a strong Robinhood Chain project." /></Reveal>
       <div className="home-roadmap-list">
-        {roadmap.map(([phase, title, copy], index) => <Reveal className={`delay-${index + 1}`} key={phase}><article><span>{String(index + 1).padStart(2, "0")}</span><div><small>{phase}</small><h3>{title}</h3><p>{copy}</p></div>{index === 0 ? <em><i />Active</em> : <ChevronRight />}</article></Reveal>)}
+        {roadmap.map(({ phase, title, copy }, index) => {
+          const isOpen = openRoadmap === index;
+          return <Reveal className={`delay-${index + 1}`} key={title}>
+            <article className={isOpen ? "open" : ""}>
+              <button type="button" onClick={() => setOpenRoadmap(isOpen ? -1 : index)} aria-expanded={isOpen}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <div><small>{phase}</small><h3>{title}</h3></div>
+                {index === 0 ? <em><i />Active</em> : null}
+                <ChevronRight className="roadmap-chevron" />
+              </button>
+              <div className="roadmap-details"><p>{copy}</p></div>
+            </article>
+          </Reveal>;
+        })}
       </div>
     </section>
 
     <section className="home-section home-whitepaper" id="whitepaper">
-      <Reveal className="home-whitepaper-card">
-        <div className="whitepaper-document"><span><FileText /></span><div><small>PAN.AI</small><b>WHITEPAPER</b><i /><i /><i /><em>Project Agent Network</em></div></div>
-        <div className="whitepaper-copy"><span>READ THE VISION</span><h2>The product, token and path forward.</h2><p>The PAN whitepaper is the source for the complete vision: why PAN exists, how $PAN fits into the platform, the chosen Pons launch model and how the ecosystem is intended to grow.</p>
-          {whitepaperUrl ? <a className="home-primary-cta" href={whitepaperUrl} target="_blank" rel="noreferrer">Read the whitepaper<FileText /></a> : <button className="home-primary-cta" onClick={() => scrollToSection("tokenomics")}>Explore the token model<ArrowRight /></button>}
+      <Reveal>
+        <SectionHeading eyebrow="PAN WHITEPAPER" title="Read the full PAN vision." copy="Explore how PAN is being built for Robinhood Chain, how $PAN connects to product usage, why Pons is the chosen launchpad and how the platform will continue to grow." align="center" />
+        <div className="home-whitepaper-actions">
+          {whitepaperUrl ? <a className="home-primary-cta" href={whitepaperUrl} target="_blank" rel="noreferrer">Open the whitepaper<FileText /></a> : <span className="whitepaper-coming-soon"><FileText />Whitepaper link coming soon</span>}
         </div>
       </Reveal>
     </section>
