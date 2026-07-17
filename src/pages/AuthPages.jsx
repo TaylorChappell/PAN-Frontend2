@@ -26,15 +26,15 @@ function Field({ label, icon: Icon, type = "text", ...props }) {
   return <label className="auth-field"><span>{label}</span><div>{Icon ? <Icon size={18} /> : null}<input type={password && visible ? "text" : type} {...props} />{password ? <button type="button" onClick={() => setVisible((v) => !v)} aria-label={visible ? "Hide password" : "Show password"}>{visible ? <EyeOff /> : <Eye />}</button> : null}</div></label>;
 }
 
-function GoogleButton() {
-  return <button className="google-button" onClick={() => window.location.assign(endpoints.auth.googleUrl)}><span>G</span>Continue with Google</button>;
+function GoogleButton({ onClick, loading = false }) {
+  return <button type="button" className="google-button" disabled={loading} onClick={onClick}>{loading ? <LoaderCircle className="spin" size={18} /> : <span>G</span>}Continue with Google</button>;
 }
 
 export function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const [values, setValues] = useState({ email: "", password: "", remember: true });
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => { if (user) navigate("/", { replace: true }); }, [user, navigate]);
 
@@ -44,10 +44,11 @@ export function LoginPage() {
     catch (requestError) { setError(requestError.message); }
     finally { setLoading(false); }
   };
+  const google = async () => { setGoogleLoading(true); setError(""); try { const data = await endpoints.auth.google(); if (!data?.url) throw new Error("Google sign-in did not return an authorization URL."); window.location.assign(data.url); } catch (requestError) { setError(requestError.message); setGoogleLoading(false); } };
 
   return <AuthLayout eyebrow="Welcome back" title="Build the next coin people remember." copy="Plan, design, launch and monitor your Robinhood Chain project from one focused workspace.">
     <form className="auth-form" onSubmit={submit}><div className="auth-form-heading"><h2>Sign in to PAN</h2><p>Continue your projects where you left off.</p></div>
-      {error ? <Notice>{error}</Notice> : null}<GoogleButton/><div className="or"><span>or continue with email</span></div>
+      {error ? <Notice>{error}</Notice> : null}<GoogleButton loading={googleLoading} onClick={google}/><div className="or"><span>or continue with email</span></div>
       <Field label="Email address" icon={Mail} type="email" autoComplete="email" required value={values.email} onChange={(e) => setValues({ ...values, email: e.target.value })} placeholder="you@example.com" />
       <Field label="Password" icon={LockKeyhole} type="password" autoComplete="current-password" required value={values.password} onChange={(e) => setValues({ ...values, password: e.target.value })} placeholder="Your password" />
       <div className="form-split"><label className="checkbox"><input type="checkbox" checked={values.remember} onChange={(e) => setValues({ ...values, remember: e.target.checked })}/><span />Remember me</label><Link to="/forgot-password">Forgot password?</Link></div>
@@ -68,7 +69,7 @@ export function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [values, setValues] = useState({ username: "", email: "", password: "", confirm: "" });
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const rules = useMemo(() => passwordRules(values.password), [values.password]);
   const valid = values.username.length >= 2 && /\S+@\S+\.\S+/.test(values.email) && Object.values(rules).every(Boolean) && values.password === values.confirm;
@@ -82,10 +83,11 @@ export function RegisterPage() {
     } catch (requestError) { setError(requestError.message); }
     finally { setLoading(false); }
   };
+  const google = async () => { setGoogleLoading(true); setError(""); try { const data = await endpoints.auth.google(); if (!data?.url) throw new Error("Google sign-in did not return an authorization URL."); window.location.assign(data.url); } catch (requestError) { setError(requestError.message); setGoogleLoading(false); } };
 
   return <AuthLayout eyebrow="Create your workspace" title="From idea to live coin, without the busywork." copy="Your account gets dedicated payment and operational wallets, project history and secure credit accounting.">
     <form className="auth-form" onSubmit={submit}><div className="auth-form-heading"><h2>Create your PAN account</h2><p>Your email must be verified before you can sign in.</p></div>
-      {error ? <Notice>{error}</Notice> : null}<GoogleButton/><div className="or"><span>or create with email</span></div>
+      {error ? <Notice>{error}</Notice> : null}<GoogleButton loading={googleLoading} onClick={google}/><div className="or"><span>or create with email</span></div>
       <Field label="Username" autoComplete="username" required value={values.username} onChange={(e) => setValues({ ...values, username: e.target.value })} placeholder="panbuilder" />
       <Field label="Email address" icon={Mail} type="email" autoComplete="email" required value={values.email} onChange={(e) => setValues({ ...values, email: e.target.value })} placeholder="you@example.com" />
       <Field label="Password" icon={LockKeyhole} type="password" autoComplete="new-password" required value={values.password} onChange={(e) => setValues({ ...values, password: e.target.value })} placeholder="Create a secure password" />

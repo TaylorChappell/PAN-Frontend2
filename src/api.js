@@ -67,15 +67,15 @@ const json = (value) => JSON.stringify(value);
 export const endpoints = {
   health: () => api("/api/health"),
   auth: {
-    me: () => api("/api/auth/me"),
-    login: (payload) => api("/api/auth/login", { method: "POST", body: json(payload) }),
-    register: (payload) => api("/api/auth/register", { method: "POST", body: json(payload) }),
+    me: () => api("/api/auth/get-session"),
+    login: ({ email, password, remember }) => api("/api/auth/sign-in/email", { method: "POST", body: json({ email, password, rememberMe: remember !== false }) }),
+    register: ({ username, email, password }) => api("/api/auth/sign-up/email", { method: "POST", body: json({ name: username, username, email, password, callbackURL: `${window.location.origin}${window.location.pathname}` }) }),
     verify: (payload) => api("/api/auth/verify-email", { method: "POST", body: json(payload) }),
     resend: (payload) => api("/api/auth/resend-verification", { method: "POST", body: json(payload) }),
-    forgot: (payload) => api("/api/auth/forgot-password", { method: "POST", body: json(payload) }),
+    forgot: ({ email }) => api("/api/auth/request-password-reset", { method: "POST", body: json({ email, redirectTo: `${window.location.origin}${window.location.pathname}#/reset-password` }) }),
     reset: (payload) => api("/api/auth/reset-password", { method: "POST", body: json(payload) }),
-    logout: () => api("/api/auth/logout", { method: "POST" }),
-    googleUrl: `${API_BASE}/api/auth/google`,
+    logout: () => api("/api/auth/sign-out", { method: "POST" }),
+    google: () => api("/api/auth/sign-in/social", { method: "POST", body: json({ provider: "google", callbackURL: `${window.location.origin}${window.location.pathname}` }) }),
   },
   account: {
     summary: () => api("/api/account"),
