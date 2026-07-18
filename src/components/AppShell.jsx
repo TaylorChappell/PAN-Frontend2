@@ -47,19 +47,29 @@ export function AppShell() {
   }, []);
 
   const refreshAccount = useCallback(async () => {
-    const result = await endpoints.credits.summary();
+    const result = account?.terms?.required
+      ? await endpoints.account.summary()
+      : await endpoints.credits.summary();
     mergeAccount(result);
     return result;
-  }, [mergeAccount]);
+  }, [account?.terms?.required, mergeAccount]);
 
   const reload = useCallback(async () => {
     try {
-      const [projectResult, accountResult, creditResult] = await Promise.allSettled([
-        endpoints.projects.list(), endpoints.account.summary(), endpoints.credits.summary(),
+      const accountResult = await endpoints.account.summary();
+      mergeAccount(accountResult);
+      if (accountResult?.terms?.required) {
+        setProjects([]);
+        return;
+      }
+      const [projectResult, creditResult] = await Promise.allSettled([
+        endpoints.projects.list(), endpoints.credits.summary(),
       ]);
       if (projectResult.status === "fulfilled") setProjects(projectArray(projectResult.value));
-      if (accountResult.status === "fulfilled") mergeAccount(accountResult.value);
+      else setError(projectResult.reason?.message || "Unable to load projects.");
       if (creditResult.status === "fulfilled") mergeAccount(creditResult.value);
+    } catch (requestError) {
+      setError(requestError.message || "Unable to load the workspace.");
     } finally {
       setInitialLoading(false);
     }
@@ -71,14 +81,17 @@ export function AppShell() {
       if (document.visibilityState === "visible" && location.pathname !== "/credits") refreshAccount().catch(() => {});
     };
     const receiveAccountUpdate = (event) => mergeAccount(event.detail);
+    const receiveTermsRequired = (event) => mergeAccount({ terms: event.detail });
     const timer = window.setInterval(refreshWhenVisible, 5_000);
     window.addEventListener("focus", refreshWhenVisible);
     window.addEventListener("pan:account-updated", receiveAccountUpdate);
+    window.addEventListener("pan:terms-required", receiveTermsRequired);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("focus", refreshWhenVisible);
       window.removeEventListener("pan:account-updated", receiveAccountUpdate);
+      window.removeEventListener("pan:terms-required", receiveTermsRequired);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, [location.pathname, mergeAccount, refreshAccount]);

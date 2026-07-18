@@ -36,6 +36,7 @@ function errorMessage(data, status) {
     return "Email signup is not configured on the backend. Add RESEND_API_KEY and EMAIL_FROM in Railway, then redeploy.";
   }
   if (data?.code === "INVALID_OTP") return "That code is invalid or has expired.";
+  if (data?.code === "DATABASE_TEMPORARILY_UNAVAILABLE") return "PAN's database is temporarily unavailable. Please retry in a few seconds.";
   if (status === 429 && data?.retryAfter) return `Please wait ${Math.ceil(Number(data.retryAfter))} seconds before requesting another code.`;
   return data?.error?.message || data?.error || data?.message || data?.detail || `Request failed (${status})`;
 }
@@ -71,6 +72,9 @@ export async function api(path, options = {}) {
 
   if (!response.ok) {
     if (response.status === 401) clearToken();
+    if (data?.code === "TERMS_NOT_ACCEPTED" && data?.terms) {
+      window.dispatchEvent(new CustomEvent("pan:terms-required", { detail: data.terms }));
+    }
     throw new ApiError(errorMessage(data, response.status), response.status, data);
   }
   return data;
