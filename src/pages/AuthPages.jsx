@@ -11,7 +11,7 @@ function AuthLayout({ eyebrow, title, copy, actions, children }) {
       <section className="auth-art">
         <Link className="brand auth-brand" to="/"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" />PAN.AI</Link>
         <div className="auth-pitch"><span className="eyebrow"><Sparkles size={14} />{eyebrow}</span><h1>{title}</h1><p>{copy}</p>{actions ? <div className="auth-social-actions">{actions}</div> : null}</div>
-        <small>PAN.AI tools for the Robinhood Chain ecosystem.</small>
+        <small>PAN.AI tools for the Robinhood Chain ecosystem. <Link to="/terms">Terms</Link> · <Link to="/privacy">Privacy</Link> · <Link to="/cookies">Cookies</Link></small>
       </section>
       <section className="auth-form-wrap">{children}</section>
     </main>
@@ -72,22 +72,23 @@ function passwordRules(password) {
 export function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
-  const [values, setValues] = useState({ username: "", email: "", password: "", confirm: "" });
+  const [values, setValues] = useState({ username: "", email: "", password: "", confirm: "", legalAccepted: false });
   const [loading, setLoading] = useState(false); const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const rules = useMemo(() => passwordRules(values.password), [values.password]);
-  const valid = values.username.length >= 2 && /\S+@\S+\.\S+/.test(values.email) && Object.values(rules).every(Boolean) && values.password === values.confirm;
+  const valid = values.username.length >= 2 && /\S+@\S+\.\S+/.test(values.email) && Object.values(rules).every(Boolean) && values.password === values.confirm && values.legalAccepted;
 
   const submit = async (event) => {
     event.preventDefault(); if (!valid) return setError("Complete all fields and meet each password requirement.");
     setLoading(true); setError("");
     try {
+      sessionStorage.setItem("pan_terms_accept_intent", "1");
       const result = await register({ username: values.username, email: values.email, password: values.password });
       navigate("/verify-email", { state: { email: values.email.trim().toLowerCase(), warning: result?.emailDeliveryWarning || "" } });
     } catch (requestError) { setError(requestError.message); }
     finally { setLoading(false); }
   };
-  const google = async () => { setGoogleLoading(true); setError(""); try { const data = await endpoints.auth.google(); if (!data?.url) throw new Error("Google sign-in did not return an authorization URL."); window.location.assign(data.url); } catch (requestError) { setError(requestError.message); setGoogleLoading(false); } };
+  const google = async () => { if (!values.legalAccepted) return setError("Accept the Terms of Use before continuing."); sessionStorage.setItem("pan_terms_accept_intent", "1"); setGoogleLoading(true); setError(""); try { const data = await endpoints.auth.google(); if (!data?.url) throw new Error("Google sign-in did not return an authorization URL."); window.location.assign(data.url); } catch (requestError) { setError(requestError.message); setGoogleLoading(false); } };
 
   return <AuthLayout eyebrow="Create your workspace" title="Build the next coin people remember." copy="Plan, design, launch and monitor your Robinhood Chain project from one focused workspace." actions={<AuthSocialActions />}>
     <form className="auth-form" onSubmit={submit}><div className="auth-form-heading"><h2>Create your PAN.AI account</h2><p>Your email must be verified before you can sign in.</p></div>
@@ -97,6 +98,7 @@ export function RegisterPage() {
       <Field label="Password" icon={LockKeyhole} type="password" autoComplete="new-password" required value={values.password} onChange={(e) => setValues({ ...values, password: e.target.value })} placeholder="Create a secure password" />
       <div className="password-rules">{[["letters","At least 6 letters"],["number","At least 1 number"],["symbol","At least 1 symbol"]].map(([key,text]) => <span className={rules[key] ? "met" : ""} key={key}><Check />{text}</span>)}</div>
       <Field label="Confirm password" icon={LockKeyhole} type="password" autoComplete="new-password" required value={values.confirm} onChange={(e) => setValues({ ...values, confirm: e.target.value })} placeholder="Repeat your password" />
+      <label className="checkbox legal-checkbox"><input type="checkbox" checked={values.legalAccepted} onChange={(e) => setValues({ ...values, legalAccepted: e.target.checked })}/><span />I accept the <Link to="/terms" target="_blank">Terms of Use</Link> and acknowledge the <Link to="/privacy" target="_blank">Privacy Notice</Link>.</label>
       <Button type="submit" loading={loading} disabled={!valid}>Create account</Button><p className="auth-switch">Already registered? <Link to="/login">Sign in</Link></p>
     </form>
   </AuthLayout>;
@@ -119,6 +121,10 @@ export function VerifyPage() {
       const verifiedUser = unwrapUser(result);
       if (verifiedUser) setUser(verifiedUser);
       else await refresh();
+      if (sessionStorage.getItem("pan_terms_accept_intent") === "1") {
+        await endpoints.account.acceptTerms();
+        sessionStorage.removeItem("pan_terms_accept_intent");
+      }
       navigate("/", { replace: true });
     } catch (requestError) {
       setError(requestError.data?.code === "INVALID_OTP" ? "That code is invalid or has expired. Use the latest PAN code in your inbox, or send the code again." : requestError.message);

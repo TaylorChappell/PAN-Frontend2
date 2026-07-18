@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { CircleHelp, Menu, MoreHorizontal, Pencil, Plus, Settings, ShieldCheck, Trash2, Wallet, X } from "lucide-react";
+import { CircleHelp, FileText, Menu, MoreHorizontal, Pencil, Plus, Settings, ShieldCheck, Trash2, Wallet, X } from "lucide-react";
 import { endpoints } from "../api";
 import { useAuth } from "../auth";
 import { Button, Modal, Notice } from "./UI";
@@ -22,7 +22,7 @@ function ShellSkeleton() {
 }
 
 export function AppShell() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const studioMode = /^\/projects\/[^/]+\/website(?:\/|$)/.test(location.pathname);
@@ -38,6 +38,8 @@ export function AppShell() {
   const [projectName, setProjectName] = useState("");
   const [projectWorking, setProjectWorking] = useState(false);
   const [error, setError] = useState("");
+  const [acceptingTerms, setAcceptingTerms] = useState(false);
+  const [termsChecked, setTermsChecked] = useState(false);
 
   const mergeAccount = useCallback((value) => {
     if (!value) return;
@@ -81,6 +83,30 @@ export function AppShell() {
     };
   }, [location.pathname, mergeAccount, refreshAccount]);
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    if (!account?.terms?.required || sessionStorage.getItem("pan_terms_accept_intent") !== "1") return;
+    setAcceptingTerms(true);
+    endpoints.account.acceptTerms().then((result) => {
+      sessionStorage.removeItem("pan_terms_accept_intent");
+      mergeAccount(result);
+      return reload();
+    }).catch((requestError) => setError(requestError.message)).finally(() => setAcceptingTerms(false));
+  }, [account?.terms?.required, mergeAccount, reload]);
+
+  const acceptTerms = async () => {
+    setAcceptingTerms(true); setError("");
+    try {
+      const result = await endpoints.account.acceptTerms();
+      mergeAccount(result);
+      await reload();
+    } catch (requestError) { setError(requestError.message); }
+    finally { setAcceptingTerms(false); }
+  };
+
+  const declineTerms = async () => {
+    await logout();
+    navigate("/login", { replace: true });
+  };
 
   const createProject = () => {
     setError("");
@@ -177,6 +203,7 @@ export function AppShell() {
         {!initialLoading && banner ? <div className="credit-banner"><Wallet size={17} /><span>{banner.text}</span><Link to="/credits" onClick={dismissBanner}>{banner.cta}</Link><button onClick={dismissBanner}><X size={16} /></button></div> : null}
         {initialLoading ? <ShellSkeleton /> : <Outlet context={{ projects, setProjects, account, reload }} />}
       </main>
+      {!initialLoading && account?.terms?.required ? <div className="terms-gate" role="dialog" aria-modal="true" aria-label="Accept PAN Terms of Use"><section><span className="terms-gate-icon"><FileText /></span><small>TERMS UPDATE</small><h1>Accept PAN's Terms of Use</h1><p>You must accept the current Terms of Use before using the workspace. The Privacy Notice explains how PAN handles account, project and blockchain information.</p><div className="terms-gate-links"><Link to="/terms" target="_blank">Read Terms of Use</Link><Link to="/privacy" target="_blank">Read Privacy Notice</Link><Link to="/cookies" target="_blank">Cookie Notice</Link></div><label className="checkbox legal-checkbox"><input type="checkbox" checked={termsChecked} onChange={(event) => setTermsChecked(event.target.checked)} /><span />I accept the Terms of Use and acknowledge the Privacy Notice.</label>{error ? <Notice>{error}</Notice> : null}<div className="terms-gate-actions"><Button variant="ghost" onClick={declineTerms}>Sign out</Button><Button loading={acceptingTerms} disabled={!termsChecked} onClick={acceptTerms}>Accept and continue</Button></div></section></div> : null}
       {projectMenu ? <><button className="context-menu-backdrop" aria-label="Close project menu" onClick={() => setProjectMenu(null)} /><div className="project-context-menu" style={{ left: Math.min(projectMenu.x, window.innerWidth - 180), top: Math.min(projectMenu.y, window.innerHeight - 110) }}><button onClick={() => openProjectAction("rename", projectMenu.project)}><Pencil />Rename</button><button className="danger" onClick={() => openProjectAction("delete", projectMenu.project)}><Trash2 />Delete</button></div></> : null}
       {projectAction ? <Modal title={projectAction.action === "rename" ? "Rename project" : "Delete project"} subtitle={projectAction.action === "delete" ? "This permanently removes the conversation, uploaded images, generated files, website data, environment variables, exports, and queued work for this project." : "Choose a name that is easy to find in project history."} onClose={() => !projectWorking && setProjectAction(null)}><div className="modal-body">{projectAction.action === "rename" ? <label className="field"><span>Project name</span><input autoFocus maxLength="80" value={projectName} onChange={(event) => setProjectName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") finishProjectAction(); }} /></label> : <Notice>Deletion cannot be undone.</Notice>}<div className="modal-actions"><Button variant="ghost" onClick={() => setProjectAction(null)}>Cancel</Button><Button className={projectAction.action === "delete" ? "button-danger" : ""} loading={projectWorking} disabled={projectAction.action === "rename" && !projectName.trim()} onClick={finishProjectAction}>{projectAction.action === "rename" ? "Save name" : "Delete project"}</Button></div></div></Modal> : null}
     </div>

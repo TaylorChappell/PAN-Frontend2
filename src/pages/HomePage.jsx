@@ -283,7 +283,7 @@ export function HomePage() {
 
     <footer className="home-footer">
       <div><Link className="home-brand" to="/"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><span>PAN.AI</span></Link><p>The Robinhood Chain project agent.</p></div>
-      <div className="home-footer-links"><button onClick={() => scrollToSection("why-pan")}>Why PAN</button><button onClick={() => scrollToSection("tokenomics")}>Tokenomics</button><button onClick={() => scrollToSection("roadmap")}>Roadmap</button></div>
+      <div className="home-footer-links"><button onClick={() => scrollToSection("why-pan")}>Why PAN</button><button onClick={() => scrollToSection("tokenomics")}>Tokenomics</button><button onClick={() => scrollToSection("roadmap")}>Roadmap</button><Link to="/terms">Terms</Link><Link to="/privacy">Privacy</Link><Link to="/cookies">Cookies</Link></div>
       <SocialLinks compact />
       <small>© {new Date().getFullYear()} PAN.AI. Built for Robinhood Chain.</small>
     </footer>

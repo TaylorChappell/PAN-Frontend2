@@ -119,6 +119,7 @@ export const endpoints = {
   account: {
     summary: () => api("/api/account"),
     update: (payload) => api("/api/account", { method: "PATCH", body: json(payload) }),
+    acceptTerms: () => api("/api/account/terms", { method: "POST", body: json({}) }),
   },
   projects: {
     list: () => api("/api/projects"),

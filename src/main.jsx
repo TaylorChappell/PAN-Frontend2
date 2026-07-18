@@ -11,6 +11,8 @@ import { CreditsPage } from "./pages/CreditsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SupportPage } from "./pages/SupportPage";
 import { AdminPage } from "./pages/AdminPage";
+import { CookiesPage, PrivacyPage, TermsPage } from "./pages/LegalPages";
+import { CookieConsent } from "./components/CookieConsent";
 import "./styles.css";
 
 function BootScreen() {
@@ -47,7 +49,7 @@ function normalizeDirectRoute() {
   if (basePath && !pathname.startsWith(basePath)) return;
   const routePath = basePath ? pathname.slice(basePath.length) || "/" : pathname;
   const normalizedRoute = routePath.length > 1 ? routePath.replace(/\/+$/, "") : routePath;
-  const appRoute = /^\/(?:admin|login|register|verify-email|forgot-password|reset-password|credits|settings|support|projects(?:\/.*)?)$/;
+  const appRoute = /^\/(?:admin|login|register|verify-email|forgot-password|reset-password|terms|privacy|cookies|credits|settings|support|projects(?:\/.*)?)$/;
   if (!appRoute.test(normalizedRoute)) return;
   const target = `${basePath || ""}/#${normalizedRoute}${window.location.search}`;
   window.history.replaceState(null, "", target);
@@ -63,6 +65,9 @@ function App() {
       <Route path="/verify-email" element={<VerifyPage />} />
       <Route path="/forgot-password" element={<ForgotPage />} />
       <Route path="/reset-password" element={<ResetPage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/cookies" element={<CookiesPage />} />
       <Route path="/" element={<WorkspaceGateway />}>
         <Route index element={<ProjectPage />} />
         <Route path="projects/:projectId" element={<ProjectPage />} />
@@ -83,7 +88,7 @@ function App() {
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <HashRouter>
-      <AuthProvider><App /></AuthProvider>
+      <AuthProvider><App /><CookieConsent /></AuthProvider>
     </HashRouter>
   </React.StrictMode>,
 );
