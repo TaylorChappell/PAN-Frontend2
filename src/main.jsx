@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { Navigate, Route, Routes, HashRouter, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, HashRouter, useLocation, useOutletContext } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth";
 import { AppShell } from "./components/AppShell";
 import { LoginPage, RegisterPage, VerifyPage, ForgotPage, ResetPage } from "./pages/AuthPages";
@@ -30,11 +30,30 @@ function WorkspaceGateway() {
 
 function AdminProtected({ children }) {
   const { user, loading } = useAuth();
+  const shell = useOutletContext();
   if (loading) return <BootScreen />;
   if (!user) return <Navigate to="/login" replace />;
-  if (!user.isAdmin && user.role !== "admin") return <Navigate to="/" replace />;
+  const isAdmin = Boolean(shell?.account?.isAdmin || user.isAdmin || user.role === "admin");
+  if (!isAdmin) return <Navigate to="/" replace />;
   return children;
 }
+
+
+function normalizeDirectRoute() {
+  if (window.location.hash) return;
+  const base = String(import.meta.env.BASE_URL || "/");
+  const basePath = base === "/" ? "" : base.replace(/\/$/, "");
+  const pathname = window.location.pathname;
+  if (basePath && !pathname.startsWith(basePath)) return;
+  const routePath = basePath ? pathname.slice(basePath.length) || "/" : pathname;
+  const normalizedRoute = routePath.length > 1 ? routePath.replace(/\/+$/, "") : routePath;
+  const appRoute = /^\/(?:admin|login|register|verify-email|forgot-password|reset-password|credits|settings|support|projects(?:\/.*)?)$/;
+  if (!appRoute.test(normalizedRoute)) return;
+  const target = `${basePath || ""}/#${normalizedRoute}${window.location.search}`;
+  window.history.replaceState(null, "", target);
+}
+
+normalizeDirectRoute();
 
 function App() {
   return (
