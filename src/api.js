@@ -80,12 +80,13 @@ const json = (value) => JSON.stringify(value);
 
 const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 
-async function waitForAiRun(run) {
+async function waitForAiRun(run, onProgress) {
   const id = run?.id || run?.runId;
   if (!id) throw new ApiError("PAN did not return an AI run id.");
   const startedAt = Date.now();
   for (let attempt = 0; attempt < 180; attempt += 1) {
     const result = await api(`/api/ai/runs/${encodeURIComponent(id)}`);
+    onProgress?.(result);
     const status = result?.run?.status || result?.status;
     if (status === "succeeded") return result;
     if (status === "failed" || status === "cancelled") throw new ApiError(result?.run?.errorMessage || result?.error || `AI run ${status}.`);
@@ -130,7 +131,7 @@ export const endpoints = {
     launchPreview: (id, payload) => api("/api/launches/preview", { method: "POST", body: json({ projectId: id, walletMode: payload.walletMode === "connected" ? "external" : "managed", devBuyEth: String(payload.devBuyEth || 0) }) }),
     message: async (id, payload) => {
       const created = await api(`/api/projects/${encodeURIComponent(id)}/chat`, { method: "POST", body: json({ prompt: payload.message, performance: payload.performance, attachments: payload.attachments, idempotencyKey: crypto.randomUUID() }) });
-      return waitForAiRun(created?.run || created);
+      return waitForAiRun(created?.run || created, payload.onProgress);
     },
     launch: (id, payload) => api(`/api/projects/${encodeURIComponent(id)}/launch`, { method: "POST", body: json({ walletMode: payload.walletMode === "connected" ? "external" : "managed", devBuyEth: String(payload.devBuyEth || 0), feeWalletAddress: payload.feeWalletAddress?.trim() || undefined, idempotencyKey: crypto.randomUUID() }) }),
     launchStatus: (id) => api(`/api/projects/${encodeURIComponent(id)}/launch-status`, { method: "POST", body: json({}) }),

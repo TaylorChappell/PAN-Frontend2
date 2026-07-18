@@ -75,6 +75,7 @@ export function ProjectPage() {
   const [loading, setLoading] = useState(Boolean(projectId));
   const [saving, setSaving] = useState(false);
   const [thinking, setThinking] = useState(false);
+  const [aiActivity, setAiActivity] = useState("thinking");
   const [message, setMessage] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [pendingCoinImage, setPendingCoinImage] = useState(null);
@@ -264,10 +265,22 @@ export function ProjectPage() {
     const outgoingAttachments = attachments;
     setError(""); setMessage(""); setAttachments([]);
     const userMessage = { id: crypto.randomUUID(), role: "user", content: clean, attachments: outgoingAttachments };
-    setProject((old) => ({ ...old, messages: [...old.messages, userMessage] })); setThinking(true);
+    setProject((old) => ({ ...old, messages: [...old.messages, userMessage] })); setAiActivity("thinking"); setThinking(true);
     try {
       const id = await ensureProject();
-      const data = await endpoints.projects.message(id, { message: clean, performance: project.performance, attachments: outgoingAttachments.map(({ fileName, mimeType, size, dataUrl }) => ({ fileName, mimeType, size, dataUrl })) });
+      const data = await endpoints.projects.message(id, {
+        message: clean,
+        performance: project.performance,
+        attachments: outgoingAttachments.map(({ fileName, mimeType, size, dataUrl }) => ({ fileName, mimeType, size, dataUrl })),
+        onProgress: (progress) => {
+          const executions = progress?.toolExecutions || [];
+          const websiteActive = ["queued", "generating"].includes(progress?.website?.status)
+            || executions.some((execution) => execution.name === "pan_write_website" && execution.status !== "failed");
+          const imageActive = executions.some((execution) => execution.name === "pan_request_image" && execution.status !== "failed");
+          if (websiteActive) setAiActivity("website");
+          else if (imageActive) setAiActivity("image");
+        },
+      });
       const generatedAsset = data?.asset?.url ? { id: data.asset.id, url: data.asset.url, fileName: data.asset.originalName || "Generated image", mimeType: data.asset.contentType || "image/png" } : null;
       const assistantMessage = { id: data?.message?.id || data?.id || crypto.randomUUID(), role: "assistant", content: extractReply(data), attachments: generatedAsset ? [generatedAsset] : [] };
       const projectChanges = data?.asset?.kind === "logo" && data.asset.url ? { imageUrl: data.asset.url } : {};
@@ -286,7 +299,7 @@ export function ProjectPage() {
       if (data?.website?.id && ["ready", "published"].includes(data.website.status)) navigate(`/projects/${id}/website/${data.website.id}`);
       else if (data?.website?.status === "failed") setError(data.website.errorMessage || "Website Studio could not complete the build.");
     } catch (e) { setError(e.message); setAttachments(outgoingAttachments); }
-    finally { setThinking(false); }
+    finally { setThinking(false); setAiActivity("thinking"); }
   };
 
   const openWebsiteStudio = () => {
@@ -299,22 +312,17 @@ export function ProjectPage() {
   };
 
   const generateImage = async () => {
-    if (!imagePrompt.trim()) return;
+    const prompt = imagePrompt.trim();
+    if (!prompt) return;
     if (!project.id) {
       setImageOpen(false);
       setError("Send your first message to PAN before generating project artwork.");
       messageInput.current?.focus();
       return;
     }
-    setThinking(true); setError("");
-    try {
-      const id = project.id;
-      const data = await endpoints.images.generate({ projectId: id, prompt: imagePrompt, performance: project.performance, purpose: "coin_logo" });
-      const url = data?.asset?.url || data?.imageUrl || data?.image?.url || data?.url;
-      if (!url) throw new Error("Image generation finished without an image URL.");
-      await persist({ imageUrl: url }); setImageOpen(false);
-    } catch (e) { setError(e.message); }
-    finally { setThinking(false); }
+    setImageOpen(false);
+    setImagePrompt("");
+    await send(`Generate a coin logo image for this project using this brief: ${prompt}`);
   };
 
   const launchCoin = async () => {
@@ -355,7 +363,7 @@ export function ProjectPage() {
           <div className="chat-feed" ref={feedRef} role="log" aria-label="AI chat messages" aria-live="polite" tabIndex={0}>
             {!project.messages.length ? <><div className="pan-message"><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>PAN · PROJECT AGENT</small><p>Tell me what you want to create. I’ll ask whenever an important detail is unclear.</p><p>To launch a coin, I’ll need its name, ticker and image. Website and X account are optional.</p></div></div><div className="suggestion-row"><button onClick={() => send("Help me shape the idea for my coin") }><MessageSquare />Shape my idea</button><button onClick={() => setImageOpen(true)}><Sparkles />Generate a logo</button><button onClick={openWebsiteStudio}><Earth />Build its website</button></div></> : null}
             {project.messages.map((item) => item.role === "user" ? <div className="user-message" key={item.id}>{item.content || item.message ? <p>{item.content || item.message}</p> : null}{item.attachments?.length ? <div className="message-images">{item.attachments.map((image, index) => <img key={image.id || image.url || index} src={mediaUrl(image.url || image.dataUrl)} alt={image.fileName || "Chat attachment"} />)}</div> : null}</div> : <div className="pan-message" key={item.id}><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>PAN · PROJECT AGENT</small><p><InlineMarkdown>{item.content || item.message}</InlineMarkdown></p>{item.attachments?.length ? <div className="message-images">{item.attachments.map((image, index) => <img key={image.id || image.url || index} src={mediaUrl(image.url || image.dataUrl)} alt={image.fileName || "Generated image"} />)}</div> : null}</div></div>)}
-            {thinking ? <div className="pan-message thinking"><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>PAN IS THINKING</small><div className="thinking-dots"><i/><i/><i/></div></div></div> : null}
+            {thinking ? <div className={`pan-message thinking ${aiActivity === "website" ? "website-build-thinking" : ""}`}><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>{aiActivity === "website" ? "PAN IS BUILDING YOUR WEBSITE" : aiActivity === "image" ? "PAN IS CREATING AN IMAGE" : "PAN IS THINKING"}</small>{aiActivity === "website" ? <p className="build-progress-copy">Build in progress. PAN is generating, validating and saving the Website Studio files.</p> : null}<div className="thinking-dots"><i/><i/><i/></div></div></div> : null}
           </div>
         </div>
         <div className="composer-dock"><div className="composer" onPaste={handlePaste}>{attachments.length ? <div className="attachment-strip">{attachments.map((image) => <div key={image.id}><img src={image.dataUrl} alt={image.fileName} /><button aria-label={`Remove ${image.fileName}`} onClick={() => setAttachments((old) => old.filter((item) => item.id !== image.id))}><X /></button><span>{image.fileName}</span></div>)}</div> : null}<textarea ref={messageInput} rows="1" aria-label="Message PAN" placeholder="Message PAN…" value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} /><div><span><button aria-label="Attach images" title="Upload images" onClick={() => chatImageInput.current?.click()}><Paperclip /></button><button aria-label="Generate image" title="Generate image" onClick={() => setImageOpen(true)}><ImageIcon /></button><button aria-label="Open Website Studio" title="Website Studio" onClick={openWebsiteStudio}><Earth /></button><input ref={chatImageInput} hidden multiple type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { addChatImages(e.target.files); e.target.value = ""; }}/></span><span className="composer-actions"><label>Performance<select aria-label="Performance" value={project.performance} onChange={(e) => persist({ performance: e.target.value })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="extra_high">Extra high</option></select></label><button className="send-button" disabled={(!message.trim() && !attachments.length) || thinking} onClick={() => send()} aria-label="Send"><Send /></button></span></div></div></div>
