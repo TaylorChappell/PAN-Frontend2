@@ -245,7 +245,6 @@ export function HomePage() {
     <section className="home-section home-pons-section">
       <Reveal className="home-pons-card">
         <div className="home-pons-copy"><span className="home-pons-icon"><Rocket /></span><div><small>CHOSEN LAUNCHPAD</small><h2>PAN launches with Pons.</h2><p>Pons is the launchpad PAN is being built around for Robinhood Chain. The goal is a cleaner path from the project workspace to a live coin, without making users stitch the process together themselves.</p><a href={ponsUrl} target="_blank" rel="noreferrer">Explore $PAN on Pons<ExternalLink /></a></div></div>
-        <div className="home-chain-graphic"><span className="chain-point point-a" /><span className="chain-point point-b" /><span className="chain-point point-c" /><span className="chain-point point-d" /><i className="chain-line line-a" /><i className="chain-line line-b" /><i className="chain-line line-c" /><div><Network /><b>Robinhood Chain</b><small>Built for the ecosystem</small></div><em><Rocket /><b>Pons</b><small>Launchpad</small></em></div>
       </Reveal>
     </section>
 
@@ -260,8 +259,10 @@ export function HomePage() {
         <Reveal className="home-flywheel-visual delay-2">
           <div className="flywheel-core"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><b>PAN</b><small>GROWTH LOOP</small></div>
           <div className="flywheel-track" />
+          <div className="flywheel-energy-ring" aria-hidden="true" />
+          <div className="flywheel-energy-runner" aria-hidden="true"><i /></div>
           <span className="flywheel-hover-hint"><i />Hover or focus each step</span>
-          {flywheelSteps.map(({ title, icon: Icon }, index) => <button type="button" className={`flywheel-step flywheel-step-${index + 1}`} aria-label={`Step ${index + 1}: ${title}`} aria-describedby={`flywheel-tooltip-${index + 1}`} key={title}>
+          {flywheelSteps.map(({ title, icon: Icon }, index) => <button type="button" className={`flywheel-step flywheel-step-${index + 1}`} style={{ "--pulse-delay": `${index}s` }} aria-label={`Step ${index + 1}: ${title}`} aria-describedby={`flywheel-tooltip-${index + 1}`} key={title}>
             <span className="flywheel-step-number">{index + 1}</span>
             <Icon />
             <span className="flywheel-step-tooltip" id={`flywheel-tooltip-${index + 1}`} role="tooltip"><small>STEP {String(index + 1).padStart(2, "0")}</small><strong>{title}</strong></span>

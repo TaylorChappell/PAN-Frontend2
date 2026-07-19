@@ -157,7 +157,7 @@ export const endpoints = {
     },
   },
   credits: {
-    summary: () => api("/api/credits"),
+    summary: (refresh = false) => api(`/api/credits${refresh ? "?refresh=1" : ""}`),
     quote: (payload) => api("/api/credits/quote", { method: "POST", body: json({ paymentAsset: payload.asset === "ETH" ? "eth" : "pan", amount: Number(payload.amount) }) }),
     history: () => api("/api/credits/transactions"),
   },
