@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
   ArrowUpRight,
   Braces,
@@ -267,6 +267,9 @@ function CodeEditor({ path, value, onChange, disabled }) {
 export function WebsiteBuilderPage() {
   const { projectId, siteId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { account } = useOutletContext();
+  const performance = ["low", "medium", "high", "extra_high"].includes(account?.settings?.performance) ? account.settings.performance : "medium";
   const [site, setSite] = useState(null);
   const [selected, setSelected] = useState("src/App.tsx");
   const [expanded, setExpanded] = useState(new Set(["src"]));
@@ -284,12 +287,30 @@ export function WebsiteBuilderPage() {
   const [deploy, setDeploy] = useState({ frontendRepo: "pan-website", backendRepo: "pan-website-backend", frontendVisibility: "public", backendVisibility: "private" });
 
   useEffect(() => {
+    let active = true;
+    let retryTimer = null;
+    const followWebsiteBuild = Boolean(location.state?.followWebsiteBuild && !siteId);
     setLoading(true);
-    endpoints.sites.get(projectId, siteId)
-      .then((result) => setSite(normalizeSite({ ...result, projectId })))
-      .catch((requestError) => { setError(requestError.message); setSite(normalizeSite({ projectId })); })
-      .finally(() => setLoading(false));
-  }, [projectId, siteId]);
+    const load = async () => {
+      try {
+        const result = await endpoints.sites.get(projectId, siteId);
+        if (!active) return;
+        const next = normalizeSite({ ...result, projectId });
+        setSite(followWebsiteBuild && !next.id ? { ...next, status: "queued" } : next);
+        setError("");
+        if (followWebsiteBuild && !next.id) retryTimer = window.setTimeout(load, 1_000);
+        else if (followWebsiteBuild && next.id) navigate(`/projects/${projectId}/website/${next.id}`, { replace: true, state: null });
+      } catch (requestError) {
+        if (!active) return;
+        if (followWebsiteBuild) retryTimer = window.setTimeout(load, 1_000);
+        else { setError(requestError.message); setSite(normalizeSite({ projectId })); }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    load();
+    return () => { active = false; if (retryTimer) window.clearTimeout(retryTimer); };
+  }, [location.state?.followWebsiteBuild, navigate, projectId, siteId]);
 
   const filePathKey = useMemo(() => (site?.files || []).map((file) => file.path).sort().join("\n"), [site?.files]);
   useEffect(() => {
@@ -368,11 +389,12 @@ export function WebsiteBuilderPage() {
     try {
       const id = await ensureSite();
       const fullstack = site.runtime === "railway_node" || promptNeedsBackend(prompt);
+      const basedOnVersionId = ["ready", "published"].includes(site.status) ? site.id || undefined : undefined;
       const data = await endpoints.sites.run(id, {
         prompt: `${prompt.trim()}\n\nBuild the frontend in React with TypeScript. If backend functionality is needed, implement the backend in TypeScript. Never fabricate dynamic counts or metrics, and do not use em dashes anywhere in the website.`,
-        performance: "medium",
+        performance,
         runtime: fullstack ? "fullstack" : "static",
-        basedOnVersionId: site.id || undefined,
+        basedOnVersionId,
       });
       const next = normalizeSite({ ...data, projectId });
       setSite((old) => ({ ...old, ...next }));
@@ -425,7 +447,7 @@ export function WebsiteBuilderPage() {
   if (!site) return <EmptyState title="Website unavailable" text={error || "PAN could not load this website."} />;
 
   return <div className="builder-page">
-    <header className="builder-header"><div><p>PROJECT WEBSITE</p><input aria-label="Website name" value={site.name} onChange={(event) => setSite({ ...site, name: event.target.value })}/><span className={`status-pill ${site.status === "published" || site.status === "ready" ? "live" : "draft"}`}>{building ? "building" : site.status}</span></div><div><Button variant="ghost" onClick={() => navigate(`/projects/${projectId}`)}>Back to project</Button><Button variant="ghost" onClick={() => setEnvOpen(true)}><KeyRound/>Environment</Button><a className="button button-ghost" href={site.zipUrl ? endpoints.sites.assetUrl(site.zipUrl) : "#"} onClick={(event) => !site.zipUrl && event.preventDefault()}><Download/>ZIP</a><Button onClick={() => setDeployOpen(true)}><Rocket/>Export & deploy</Button></div></header>
+    <header className="builder-header"><div><p>PROJECT WEBSITE</p><input aria-label="Website name" value={site.name} onChange={(event) => setSite({ ...site, name: event.target.value })}/><span className={`status-pill ${site.status === "published" || site.status === "ready" ? "live" : "draft"}`}>{building ? "building" : site.status}</span></div><div><Button variant="ghost" onClick={() => navigate(`/projects/${projectId}`)}>Back to project</Button><Button variant="ghost" onClick={() => setEnvOpen(true)}><KeyRound/>ENV VARIABLES</Button><a className="button button-ghost" href={site.zipUrl ? endpoints.sites.assetUrl(site.zipUrl) : "#"} onClick={(event) => !site.zipUrl && event.preventDefault()}><Download/>ZIP</a><Button onClick={() => setDeployOpen(true)}><Rocket/>Export & deploy</Button></div></header>
     {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
     <div className="builder-workspace">
       <aside className="builder-chat">
