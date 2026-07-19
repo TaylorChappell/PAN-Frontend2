@@ -187,7 +187,7 @@ export function HomePage() {
 
     <section className="home-hero" id="product">
       <div className="home-hero-copy">
-        <h1>Build the next coin <em>people remember.</em></h1>
+        <h1>Build the next project <em>people remember.</em></h1>
         <p>PAN is a Robinhood Chain-specific AI that helps turn an idea into a complete coin project, from the concept and visuals to the website, Pons launch and live project workspace.</p>
         <div className="home-hero-actions">
           <Link className="home-primary-cta" to="/register">Start building<ArrowRight /></Link>
