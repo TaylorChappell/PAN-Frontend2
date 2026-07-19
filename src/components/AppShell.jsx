@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { CircleHelp, FileText, Menu, MoreHorizontal, Pencil, Plus, Settings, ShieldCheck, Trash2, Wallet, X } from "lucide-react";
-import { endpoints } from "../api";
+import { CircleHelp, FileText, LoaderCircle, Menu, MoreHorizontal, Pencil, Plus, Settings, ShieldCheck, Trash2, Wallet, X } from "lucide-react";
+import { endpoints, mediaUrl } from "../api";
 import { useAuth } from "../auth";
 import { Button, Modal, Notice } from "./UI";
 
@@ -78,10 +78,15 @@ export function AppShell() {
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => {
     const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible" && location.pathname !== "/credits") refreshAccount().catch(() => {});
+      if (document.visibilityState !== "visible") return;
+      if (location.pathname !== "/credits") refreshAccount().catch(() => {});
+      if (!account?.terms?.required) {
+        endpoints.projects.list().then((result) => setProjects(projectArray(result))).catch(() => {});
+      }
     };
     const receiveAccountUpdate = (event) => mergeAccount(event.detail);
     const receiveTermsRequired = (event) => mergeAccount({ terms: event.detail });
+    refreshWhenVisible();
     const timer = window.setInterval(refreshWhenVisible, 5_000);
     window.addEventListener("focus", refreshWhenVisible);
     window.addEventListener("pan:account-updated", receiveAccountUpdate);
@@ -94,7 +99,7 @@ export function AppShell() {
       window.removeEventListener("pan:terms-required", receiveTermsRequired);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [location.pathname, mergeAccount, refreshAccount]);
+  }, [account?.terms?.required, location.pathname, mergeAccount, refreshAccount]);
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
   useEffect(() => {
     if (!account?.terms?.required || sessionStorage.getItem("pan_terms_accept_intent") !== "1") return;
@@ -189,10 +194,11 @@ export function AppShell() {
           <nav className="project-list">
             {initialLoading ? <div className="project-list-skeleton" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <i key={index}/>)}</div> : projects.map((project) => {
               const id = project.id || project.projectId;
+              const activeRun = project.activeRun && ["queued", "running"].includes(project.activeRun.status) ? project.activeRun : null;
               return <div className="project-list-item" key={id} onContextMenu={(event) => { event.preventDefault(); setProjectMenu({ id, x: event.clientX, y: event.clientY, project }); }}>
                 <NavLink to={`/projects/${id}`}>
-                  <span>{(project.name || project.coinName || "U").slice(0, 1).toUpperCase()}</span>
-                  <div><b>{project.name || project.coinName || "Untitled coin"}</b><small>{project.status || "Draft"}</small></div>
+                  <span className="project-coin-icon">{project.imageUrl ? <img src={mediaUrl(project.imageUrl)} alt="" /> : (project.name || project.coinName || "U").slice(0, 1).toUpperCase()}</span>
+                  <div><b>{project.name || project.coinName || "Untitled coin"}</b>{activeRun ? <small className="project-ai-activity"><LoaderCircle className="spin" />PAN is working</small> : <small>{project.status || "Draft"}</small>}</div>
                 </NavLink>
                 <button className="project-more" aria-label="Project options" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); setProjectMenu({ id, x: rect.right, y: rect.bottom, project }); }}><MoreHorizontal /></button>
               </div>;

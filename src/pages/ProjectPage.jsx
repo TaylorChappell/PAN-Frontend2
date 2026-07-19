@@ -9,7 +9,13 @@ const blankProject = {
   id: null, name: "Untitled coin", coinName: "", ticker: "", description: "", imageUrl: "", website: "", xAccount: "", telegram: "", performance: "medium", status: "draft", messages: [],
 };
 
-function normalizeProject(data) {
+const performanceModes = new Set(["low", "medium", "high", "extra_high"]);
+
+function normalizePerformance(value) {
+  return performanceModes.has(value) ? value : "medium";
+}
+
+function normalizeProject(data, fallbackPerformance = "medium") {
   const source = data?.project || data || {};
   const coin = source.coin || source.details || {};
   return {
@@ -21,6 +27,7 @@ function normalizeProject(data) {
     website: coin.website || source.website || source.websiteUrl || "",
     xAccount: coin.xAccount || coin.x || source.xAccount || source.x || source.xHandle || "",
     telegram: coin.telegram || source.telegram || source.telegramHandle || "",
+    performance: performanceModes.has(source.performance) ? source.performance : normalizePerformance(fallbackPerformance),
     messages: source.messages || [],
   };
 }
@@ -32,9 +39,20 @@ function extractReply(data) {
     || "PAN finished the request.";
 }
 
+function activeRunFrom(data) {
+  const run = data?.activeRun || data?.runs?.find((item) => ["queued", "running"].includes(item.status));
+  return run && ["queued", "running"].includes(run.status) ? run : null;
+}
+
+function activityForRun(run) {
+  if (run?.kind === "website") return "website";
+  if (run?.kind === "image") return "image";
+  return "thinking";
+}
+
 function projectFields(data) {
   const normalized = normalizeProject(data);
-  const { messages: _messages, ...fields } = normalized;
+  const { messages: _messages, performance: _performance, ...fields } = normalized;
   return fields;
 }
 
@@ -70,12 +88,15 @@ export function ProjectPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { setProjects, reload } = useOutletContext();
-  const [project, setProject] = useState(blankProject);
+  const { setProjects, account, reload } = useOutletContext();
+  const accountPerformance = normalizePerformance(account?.settings?.performance);
+  const accountPerformanceRef = useRef(accountPerformance);
+  const [project, setProject] = useState(() => ({ ...blankProject, performance: accountPerformance }));
   const [loading, setLoading] = useState(Boolean(projectId));
   const [saving, setSaving] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [aiActivity, setAiActivity] = useState("thinking");
+  const [resumedRunId, setResumedRunId] = useState(null);
   const [message, setMessage] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [pendingCoinImage, setPendingCoinImage] = useState(null);
@@ -89,6 +110,9 @@ export function ProjectPage() {
   const chatImageInput = useRef(null);
   const messageInput = useRef(null);
   const feedRef = useRef(null);
+  const websiteNavigationRef = useRef(false);
+
+  useEffect(() => { accountPerformanceRef.current = accountPerformance; }, [accountPerformance]);
 
   const mergeServerProject = useCallback((data) => {
     if (!data) return;
@@ -101,7 +125,10 @@ export function ProjectPage() {
 
   useEffect(() => {
     if (!projectId) {
-      setProject({ ...blankProject, messages: [] });
+      setProject({ ...blankProject, performance: accountPerformanceRef.current, messages: [] });
+      setThinking(false);
+      setResumedRunId(null);
+      setAiActivity("thinking");
       setPendingCoinImage(null);
       setAttachments([]);
       setMessage("");
@@ -110,8 +137,20 @@ export function ProjectPage() {
       return;
     }
     setLoading(true); setError("");
-    endpoints.projects.get(projectId).then((data) => setProject(normalizeProject(data))).catch((e) => setError(e.message)).finally(() => setLoading(false));
-  }, [projectId, location.state?.newProjectNonce]);
+    endpoints.projects.get(projectId).then((data) => {
+      const next = normalizeProject(data, accountPerformanceRef.current);
+      const activeRun = activeRunFrom(data);
+      setProject(next);
+      setThinking(Boolean(activeRun));
+      setResumedRunId(activeRun?.id || null);
+      setAiActivity(activityForRun(activeRun));
+      setProjects((old) => old.map((item) => (item.id || item.projectId) === next.id ? { ...item, ...projectFields(data), activeRun } : item));
+    }).catch((e) => setError(e.message)).finally(() => setLoading(false));
+  }, [location.state?.newProjectNonce, projectId, setProjects]);
+
+  useEffect(() => {
+    setProject((old) => old.performance === accountPerformance ? old : { ...old, performance: accountPerformance });
+  }, [accountPerformance]);
 
   useEffect(() => { feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: "smooth" }); }, [project.messages, thinking]);
   useEffect(() => {
@@ -120,12 +159,30 @@ export function ProjectPage() {
     const refresh = async () => {
       try {
         const latest = await endpoints.projects.summary(project.id);
-        if (active) mergeServerProject(latest);
+        if (!active) return;
+        const activeRun = activeRunFrom(latest);
+        mergeServerProject(latest);
+        setProjects((old) => old.map((item) => (item.id || item.projectId) === project.id ? { ...item, activeRun } : item));
+        if (activeRun) setAiActivity(activityForRun(activeRun));
+        else if (resumedRunId) {
+          window.clearInterval(timer);
+          const completed = await endpoints.projects.get(project.id);
+          if (!active) return;
+          const completedProject = normalizeProject(completed, accountPerformanceRef.current);
+          const completedRun = completed?.runs?.find((run) => run.id === resumedRunId);
+          setProject(completedProject);
+          setProjects((old) => old.map((item) => (item.id || item.projectId) === project.id ? { ...item, ...projectFields(completed), activeRun: null } : item));
+          setThinking(false);
+          setResumedRunId(null);
+          setAiActivity("thinking");
+          if (completedRun?.status === "failed") setError(completedRun.errorMessage || "PAN could not complete the request.");
+          reload();
+        }
       } catch { /* The final run response still performs a source-of-truth refresh. */ }
     };
     const timer = window.setInterval(refresh, 1_500);
     return () => { active = false; window.clearInterval(timer); };
-  }, [mergeServerProject, project.id, thinking]);
+  }, [mergeServerProject, project.id, reload, resumedRunId, setProjects, thinking]);
   useEffect(() => {
     if (!project.id || project.status !== "launching") return undefined;
     let active = true;
@@ -216,6 +273,19 @@ export function ProjectPage() {
     }, 550);
   };
 
+  const selectPerformance = async (performance) => {
+    const next = normalizePerformance(performance);
+    const previous = project.performance;
+    setProject((old) => ({ ...old, performance: next }));
+    try {
+      const result = await endpoints.account.update({ defaultPerformance: next });
+      window.dispatchEvent(new CustomEvent("pan:account-updated", { detail: result }));
+    } catch (requestError) {
+      setProject((old) => old.performance === next ? { ...old, performance: previous } : old);
+      setError(requestError.message);
+    }
+  };
+
   const readCoinImage = async (file) => {
     if (!file) return;
     if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) return setError("Use a PNG, JPG, WebP or GIF image.");
@@ -265,19 +335,30 @@ export function ProjectPage() {
     const outgoingAttachments = attachments;
     setError(""); setMessage(""); setAttachments([]);
     const userMessage = { id: crypto.randomUUID(), role: "user", content: clean, attachments: outgoingAttachments };
+    websiteNavigationRef.current = false;
     setProject((old) => ({ ...old, messages: [...old.messages, userMessage] })); setAiActivity("thinking"); setThinking(true);
     try {
       const id = await ensureProject();
+      setProjects((old) => old.map((item) => (item.id || item.projectId) === id ? { ...item, activeRun: { id: `pending-${userMessage.id}`, projectId: id, kind: "chat", status: "queued" } } : item));
       const data = await endpoints.projects.message(id, {
         message: clean,
         performance: project.performance,
         attachments: outgoingAttachments.map(({ fileName, mimeType, size, dataUrl }) => ({ fileName, mimeType, size, dataUrl })),
         onProgress: (progress) => {
+          if (progress?.run?.id && ["queued", "running"].includes(progress.run.status)) {
+            setProjects((old) => old.map((item) => (item.id || item.projectId) === id ? { ...item, activeRun: progress.run } : item));
+          }
           const executions = progress?.toolExecutions || [];
           const websiteActive = ["queued", "generating"].includes(progress?.website?.status)
             || executions.some((execution) => execution.name === "pan_write_website" && execution.status !== "failed");
           const imageActive = executions.some((execution) => execution.name === "pan_request_image" && execution.status !== "failed");
-          if (websiteActive) setAiActivity("website");
+          if (websiteActive) {
+            setAiActivity("website");
+            if (!websiteNavigationRef.current) {
+              websiteNavigationRef.current = true;
+              navigate(`/projects/${id}/website`, { state: { followWebsiteBuild: true } });
+            }
+          }
           else if (imageActive) setAiActivity("image");
         },
       });
@@ -298,7 +379,7 @@ export function ProjectPage() {
       reload();
       if (data?.website?.id && ["ready", "published"].includes(data.website.status)) navigate(`/projects/${id}/website/${data.website.id}`);
       else if (data?.website?.status === "failed") setError(data.website.errorMessage || "Website Studio could not complete the build.");
-    } catch (e) { setError(e.message); setAttachments(outgoingAttachments); }
+    } catch (e) { setError(e.message); setAttachments(outgoingAttachments); reload(); }
     finally { setThinking(false); setAiActivity("thinking"); }
   };
 
@@ -363,10 +444,10 @@ export function ProjectPage() {
           <div className="chat-feed" ref={feedRef} role="log" aria-label="AI chat messages" aria-live="polite" tabIndex={0}>
             {!project.messages.length ? <><div className="pan-message"><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>PAN · PROJECT AGENT</small><p>Tell me what you want to create. I’ll ask whenever an important detail is unclear.</p><p>To launch a coin, I’ll need its name, ticker and image. Website and X account are optional.</p></div></div><div className="suggestion-row"><button onClick={() => send("Help me shape the idea for my coin") }><MessageSquare />Shape my idea</button><button onClick={() => setImageOpen(true)}><Sparkles />Generate a logo</button><button onClick={openWebsiteStudio}><Earth />Build its website</button></div></> : null}
             {project.messages.map((item) => item.role === "user" ? <div className="user-message" key={item.id}>{item.content || item.message ? <p>{item.content || item.message}</p> : null}{item.attachments?.length ? <div className="message-images">{item.attachments.map((image, index) => <img key={image.id || image.url || index} src={mediaUrl(image.url || image.dataUrl)} alt={image.fileName || "Chat attachment"} />)}</div> : null}</div> : <div className="pan-message" key={item.id}><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>PAN · PROJECT AGENT</small><p><InlineMarkdown>{item.content || item.message}</InlineMarkdown></p>{item.attachments?.length ? <div className="message-images">{item.attachments.map((image, index) => <img key={image.id || image.url || index} src={mediaUrl(image.url || image.dataUrl)} alt={image.fileName || "Generated image"} />)}</div> : null}</div></div>)}
-            {thinking ? <div className={`pan-message thinking ${aiActivity === "website" ? "website-build-thinking" : ""}`}><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>{aiActivity === "website" ? "PAN IS BUILDING YOUR WEBSITE" : aiActivity === "image" ? "PAN IS CREATING AN IMAGE" : "PAN IS THINKING"}</small>{aiActivity === "website" ? <p className="build-progress-copy">Build in progress. PAN is generating, validating and saving the Website Studio files.</p> : null}<div className="thinking-dots"><i/><i/><i/></div></div></div> : null}
+            {thinking ? <div className={`pan-message thinking ${aiActivity === "website" ? "website-build-thinking" : ""}`}><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>{aiActivity === "website" ? "PAN IS BUILDING YOUR WEBSITE" : aiActivity === "image" ? "PAN IS CREATING AN IMAGE" : resumedRunId ? "PAN IS STILL WORKING" : "PAN IS THINKING"}</small>{aiActivity === "website" ? <p className="build-progress-copy">Build in progress. PAN is generating, validating and saving the Website Studio files.</p> : resumedRunId ? <p className="build-progress-copy">Your request is still running. You can leave this project and come back at any time.</p> : null}<div className="thinking-dots"><i/><i/><i/></div></div></div> : null}
           </div>
         </div>
-        <div className="composer-dock"><div className="composer" onPaste={handlePaste}>{attachments.length ? <div className="attachment-strip">{attachments.map((image) => <div key={image.id}><img src={image.dataUrl} alt={image.fileName} /><button aria-label={`Remove ${image.fileName}`} onClick={() => setAttachments((old) => old.filter((item) => item.id !== image.id))}><X /></button><span>{image.fileName}</span></div>)}</div> : null}<textarea ref={messageInput} rows="1" aria-label="Message PAN" placeholder="Message PAN…" value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} /><div><span><button aria-label="Attach images" title="Upload images" onClick={() => chatImageInput.current?.click()}><Paperclip /></button><button aria-label="Generate image" title="Generate image" onClick={() => setImageOpen(true)}><ImageIcon /></button><button aria-label="Open Website Studio" title="Website Studio" onClick={openWebsiteStudio}><Earth /></button><input ref={chatImageInput} hidden multiple type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { addChatImages(e.target.files); e.target.value = ""; }}/></span><span className="composer-actions"><label>Performance<select aria-label="Performance" value={project.performance} onChange={(e) => persist({ performance: e.target.value })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="extra_high">Extra high</option></select></label><button className="send-button" disabled={(!message.trim() && !attachments.length) || thinking} onClick={() => send()} aria-label="Send"><Send /></button></span></div></div></div>
+        <div className="composer-dock"><div className="composer" onPaste={handlePaste}>{attachments.length ? <div className="attachment-strip">{attachments.map((image) => <div key={image.id}><img src={image.dataUrl} alt={image.fileName} /><button aria-label={`Remove ${image.fileName}`} onClick={() => setAttachments((old) => old.filter((item) => item.id !== image.id))}><X /></button><span>{image.fileName}</span></div>)}</div> : null}<textarea ref={messageInput} rows="1" aria-label="Message PAN" placeholder="Message PAN…" value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} /><div><span><button aria-label="Attach images" title="Upload images" onClick={() => chatImageInput.current?.click()}><Paperclip /></button><button aria-label="Generate image" title="Generate image" onClick={() => setImageOpen(true)}><ImageIcon /></button><button aria-label="Open Website Studio" title="Website Studio" onClick={openWebsiteStudio}><Earth /></button><input ref={chatImageInput} hidden multiple type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { addChatImages(e.target.files); e.target.value = ""; }}/></span><span className="composer-actions"><label>Performance<select aria-label="Performance" value={project.performance} onChange={(e) => selectPerformance(e.target.value)}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="extra_high">Extra high</option></select></label><button className="send-button" disabled={(!message.trim() && !attachments.length) || thinking} onClick={() => send()} aria-label="Send"><Send /></button></span></div></div></div>
       </section>
       <aside className="details-panel">
         {launched ? <CoinStats project={project} /> : <><div className="panel-title"><div><p>PROJECT OBJECT</p><h2>Coin details</h2></div><span className="completion">{complete}/3</span></div>

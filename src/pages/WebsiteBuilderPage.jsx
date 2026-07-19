@@ -451,7 +451,7 @@ export function WebsiteBuilderPage() {
     {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
     <div className="builder-workspace">
       <aside className="builder-chat">
-        <div className="builder-agent"><span><SparkIcon/></span><div><small>PAN BUILDER</small><p>Full-stack previews can use PAN’s built-in Studio database. Exported backends use built-in SQLite by default or PostgreSQL when you add DATABASE_URL.</p><em>REACT + TYPESCRIPT</em></div></div>
+        <div className="builder-agent"><span><SparkIcon/></span><div><small>PAN BUILDER</small><p>PAN can design, build and refine complete frontend and backend websites.</p><em>REACT + TYPESCRIPT</em></div></div>
         <div className="builder-history">
           {building ? <div className="builder-progress-card"><LoaderCircle className="spin"/><span><small>BUILD IN PROGRESS</small><p>PAN is generating, validating and saving the complete folder structure.</p></span></div> : null}
           {definedEnvironment.length ? <div className="builder-env-card">
@@ -473,8 +473,6 @@ export function WebsiteBuilderPage() {
       </section>
     </div>
     {envOpen ? <Modal wide title="Environment setup" subtitle="PAN encrypts saved values. Secrets are never included in GitHub exports or downloaded ZIP files." onClose={() => setEnvOpen(false)}><div className="modal-body">
-      <Notice>Database previews run against PAN’s isolated built-in Studio database. Leave DATABASE_URL blank to use built-in SQLite after export, or enter a PostgreSQL URL to switch the hosted backend to your own database.</Notice>
-      <section className="env-setup-steps"><h3>How to make the generated site work</h3><ol><li>Read <strong>What to enter</strong> for each variable. DATABASE_URL is optional; other variables marked required need a provider value.</li><li>Paste required values below and save them in PAN. A configured secret stays hidden; enter it again only when replacing it.</li><li>When deploying, add required values under <strong>Railway → Service → Variables</strong>. For the built-in SQLite database, leave DATABASE_URL unset and attach a Railway volume. For PostgreSQL, set DATABASE_URL and redeploy.</li></ol></section>
       <div className="env-table">
         <div><span>Name</span><span>What to enter</span><span>Value</span><span>Secret</span></div>
         {envRows.map((row, index) => <div key={`${row.key}-${index}`}>

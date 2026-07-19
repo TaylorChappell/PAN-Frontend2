@@ -128,10 +128,14 @@ svg { flex: 0 0 auto; }
 .project-list a { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 9px 35px 9px 10px; border-radius: 9px; color: #9fac9f; }
 .project-list a:hover,.project-list a.active { background: #151c17; color: #f4faf5; }
 .project-list a > span { width: 27px; height: 27px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 8px; background: #202a22; color: var(--green); font-size: 11px; font-weight: 850; }
+.project-list a > .project-coin-icon { overflow: hidden; }
+.project-coin-icon img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .project-list a > div { min-width: 0; }
 .project-list b,.project-list small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-list b { font-size: 12px; }
 .project-list small { color: #69756c; font-size: 9px; text-transform: capitalize; margin-top: 2px; }
+.project-list .project-ai-activity { display: flex; align-items: center; gap: 4px; color: var(--green); text-transform: none; }
+.project-ai-activity svg { width: 10px; height: 10px; flex: 0 0 auto; }
 .project-more { position: absolute; right: 5px; top: 50%; width: 27px; height: 27px; display: grid; place-items: center; transform: translateY(-50%); opacity: 0; color: #7b887e; border: 0; border-radius: 7px; background: transparent; cursor: pointer; }
 .project-list-item:hover .project-more,.project-more:focus-visible { opacity: 1; }.project-more:hover { color: var(--text); background: #222c25; }.project-more svg { width: 15px; }
 .no-projects { padding: 10px; color: #5f6b62; line-height: 1.5; }
