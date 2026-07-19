@@ -72,21 +72,21 @@ const roadmap = [
 ];
 
 const flywheelSteps = [
-  "More founders use PAN",
-  "More AI generations",
-  "More platform revenue",
-  "More PAN acquired",
-  "More PAN removed from circulation",
-  "Stronger ecosystem",
-  "More founders join",
+  { title: "More founders use PAN", icon: Network },
+  { title: "More AI generations", icon: Bot },
+  { title: "More platform revenue", icon: LineChart },
+  { title: "More PAN acquired", icon: Coins },
+  { title: "More PAN removed from circulation", icon: CircleDollarSign },
+  { title: "Stronger ecosystem", icon: Layers3 },
+  { title: "More founders join", icon: Rocket },
 ];
 
 function scrollToSection(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function Reveal({ className = "", children }) {
-  return <div className={`home-reveal ${className}`}>{children}</div>;
+function Reveal({ className = "", children, ...props }) {
+  return <div className={`home-reveal ${className}`} {...props}>{children}</div>;
 }
 
 function SectionHeading({ eyebrow, title, copy, align = "left" }) {
@@ -260,7 +260,12 @@ export function HomePage() {
         <Reveal className="home-flywheel-visual delay-2">
           <div className="flywheel-core"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><b>PAN</b><small>GROWTH LOOP</small></div>
           <div className="flywheel-track" />
-          {flywheelSteps.map((step, index) => <div className={`flywheel-step flywheel-step-${index + 1}`} key={step}><span>{index + 1}</span><p>{step}</p><ArrowRight /></div>)}
+          <span className="flywheel-hover-hint"><i />Hover or focus each step</span>
+          {flywheelSteps.map(({ title, icon: Icon }, index) => <button type="button" className={`flywheel-step flywheel-step-${index + 1}`} aria-label={`Step ${index + 1}: ${title}`} aria-describedby={`flywheel-tooltip-${index + 1}`} key={title}>
+            <span className="flywheel-step-number">{index + 1}</span>
+            <Icon />
+            <span className="flywheel-step-tooltip" id={`flywheel-tooltip-${index + 1}`} role="tooltip"><small>STEP {String(index + 1).padStart(2, "0")}</small><strong>{title}</strong></span>
+          </button>)}
         </Reveal>
       </div>
     </section>
