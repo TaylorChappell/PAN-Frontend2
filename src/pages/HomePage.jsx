@@ -3,9 +3,11 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   Bot,
+  Check,
   ChevronRight,
   CircleDollarSign,
   Coins,
+  Copy,
   ExternalLink,
   Globe2,
   Image,
@@ -72,6 +74,27 @@ const flywheelSteps = [
   { title: "Stronger ecosystem", icon: Layers3 },
   { title: "More founders join", icon: Rocket },
 ];
+
+const PAN_CONTRACT_ADDRESS = "0xf4bd36cad0eaf5396d93f5b483a3c08dffbdbd8c";
+
+async function copyText(value) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return;
+    } catch { /* Fall back for browsers that expose but deny the Clipboard API. */ }
+  }
+  const field = document.createElement("textarea");
+  field.value = value;
+  field.setAttribute("readonly", "");
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.appendChild(field);
+  field.select();
+  const copied = document.execCommand("copy");
+  field.remove();
+  if (!copied) throw new Error("Clipboard unavailable");
+}
 
 function scrollToSection(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -147,6 +170,7 @@ function HeroVisual() {
 export function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openRoadmap, setOpenRoadmap] = useState(0);
+  const [contractCopyStatus, setContractCopyStatus] = useState("idle");
   const ponsUrl = import.meta.env.VITE_PONS_TOKEN_URL || "https://pons.family";
 
   useEffect(() => {
@@ -168,6 +192,17 @@ export function HomePage() {
     scrollToSection(id);
   };
 
+  const copyContractAddress = async () => {
+    try {
+      await copyText(PAN_CONTRACT_ADDRESS);
+      setContractCopyStatus("copied");
+      window.setTimeout(() => setContractCopyStatus("idle"), 1800);
+    } catch {
+      setContractCopyStatus("failed");
+      window.setTimeout(() => setContractCopyStatus("idle"), 1800);
+    }
+  };
+
   return <main className="home-page">
     <div className="home-noise" />
     <header className="home-nav">
@@ -187,7 +222,7 @@ export function HomePage() {
 
     <section className="home-hero" id="product">
       <div className="home-hero-copy">
-        <h1>Build the next project <em>people remember.</em></h1>
+        <h1>Build the next coin <em>people remember.</em></h1>
         <p>PAN is a Robinhood Chain-specific AI that helps turn an idea into a complete coin project, from the concept and visuals to the website, Pons launch and live project workspace.</p>
         <div className="home-hero-actions">
           <Link className="home-primary-cta" to="/register">Start building<ArrowRight /></Link>
@@ -240,6 +275,13 @@ export function HomePage() {
 
     <section className="home-section home-tokenomics" id="tokenomics">
       <Reveal><SectionHeading title="The flywheel keeps growing" copy="A flywheel to assure returns to investors and to builders using PAN." align="center" /></Reveal>
+      <Reveal className="home-contract-reveal">
+        <button className={`home-contract-card ${contractCopyStatus}`} type="button" onClick={copyContractAddress} aria-label={`Copy PAN contract address ${PAN_CONTRACT_ADDRESS}`}>
+          <span className="home-contract-mark"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span>
+          <span className="home-contract-details"><strong>$PAN contract</strong><code>{PAN_CONTRACT_ADDRESS}</code></span>
+          <span className="home-contract-action" aria-live="polite">{contractCopyStatus === "copied" ? <><Check />Copied</> : contractCopyStatus === "failed" ? <>Try again</> : <><Copy />Copy</>}</span>
+        </button>
+      </Reveal>
       <div className="home-flywheel-layout">
         <Reveal className="home-flywheel-copy">
           <article><span><CircleDollarSign /></span><div><strong>50%</strong><p>of protocol revenue will be used for buybacks of the $PAN token.</p></div></article>
