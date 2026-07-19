@@ -174,8 +174,10 @@ export const endpoints = {
     run: async (projectId, payload) => {
       if (payload.operation === "save_files") return api(`/api/projects/${encodeURIComponent(projectId)}/website`, { method: "PATCH", body: json({ files: payload.files, basedOnVersionId: payload.basedOnVersionId, runtime: payload.runtime }) });
       const created = await api(`/api/projects/${encodeURIComponent(projectId)}/website`, { method: "POST", body: json({ prompt: payload.prompt, performance: payload.performance || "medium", basedOnVersionId: payload.basedOnVersionId, runtime: payload.runtime === "fullstack" ? "railway_node" : payload.runtime || "static", idempotencyKey: crypto.randomUUID() }) });
-      await waitForAiRun(created?.run || created);
-      return api(`/api/projects/${encodeURIComponent(projectId)}/website?versionId=${encodeURIComponent(created?.version?.id || "")}`);
+      const versionId = created?.version?.id;
+      return versionId
+        ? api(`/api/projects/${encodeURIComponent(projectId)}/website?versionId=${encodeURIComponent(versionId)}`)
+        : created;
     },
     env: (projectId) => api(`/api/projects/${encodeURIComponent(projectId)}/environment`),
     setEnv: async (projectId, payload) => Promise.all(payload.variables.map((variable) => api(`/api/projects/${encodeURIComponent(projectId)}/environment`, { method: "POST", body: json(variable) }))),
