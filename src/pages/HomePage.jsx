@@ -55,20 +55,30 @@ const roadmap = [
     copy: "PAN already has a deep understanding of Robinhood Chain, how launches behave and what helps coins stand out. It combines user feedback and questions with its own research tools so its knowledge keeps expanding. PAN can already plan launches, create coin visuals and build complete frontend and backend websites for projects.",
   },
   {
-    phase: "NEXT",
-    title: "Airdrops and marketing",
-    copy: "PAN will gift free credits and $PAN tokens to people who support the project and use @PanAiApp on X. Campaigns will reward useful posts, launch content and genuine community participation.",
+    phase: "BUILDER GROWTH",
+    title: "Builder incentives and community rewards",
+    copy: "PAN will direct protocol revenue and fees towards incentives for customers building successful, working products with PAN. Strategic builder incentives will attract more builders to the ecosystem, creating more products, more usage and more protocol revenue.",
   },
   {
-    phase: "GROWING",
-    title: "Smarter market intelligence",
-    copy: "We plan to hire specialists to train PAN specifically on Robinhood Chain, launch strategies, positioning and the tactics that help coins succeed. We will also make its responses faster, clearer and more useful as the model and research systems improve.",
+    phase: "CREATION LAYER",
+    title: "More creation tools & smarter intelligence",
+    copy: "PAN will constantly improve and add more creation tools for developers, including an AI treasury assistant, analytics, marketing plans and community management tools. Its intelligence for token launches and strategies will deepen as it learns more about Robinhood Chain day by day.",
   },
   {
-    phase: "EXPANDING",
-    title: "More creation tools",
-    copy: "PAN will gain tools to manage social media accounts for each coin and create complete social media and marketing plans around the project's exact niche and needs. More launch, content and growth tools will continue to be added.",
+    phase: "COMMUNITY SCALE",
+    title: "Airdrop & Hackathon",
+    copy: "Once PAN is established within the Pons ecosystem, it will host its own hackathon to bring more advanced builders onto the platform, alongside strategic token airdrops for participants from the community.",
   },
+];
+
+const flywheelSteps = [
+  "More founders use PAN",
+  "More AI generations",
+  "More platform revenue",
+  "More PAN acquired",
+  "More PAN removed from circulation",
+  "Stronger ecosystem",
+  "More founders join",
 ];
 
 function scrollToSection(id) {
@@ -240,19 +250,18 @@ export function HomePage() {
     </section>
 
     <section className="home-section home-tokenomics" id="tokenomics">
-      <Reveal><SectionHeading eyebrow="$PAN TOKENOMICS" title="Utility that grows with the product." copy="$PAN is designed around access, usage and participation in the PAN ecosystem, not empty complexity. Token activity and launch details can be published transparently through the Pons listing." align="center" /></Reveal>
-      <div className="home-token-layout">
-        <Reveal className="home-token-visual">
-          <div className="token-orb"><div><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><b>$PAN</b><small>ECOSYSTEM TOKEN</small></div><i className="token-ring token-ring-one" /><i className="token-ring token-ring-two" /></div>
-          <span className="token-flow token-flow-one">AI usage<i /></span>
-          <span className="token-flow token-flow-two">Community<i /></span>
-          <span className="token-flow token-flow-three">Expansion<i /></span>
+      <Reveal><SectionHeading eyebrow="$PAN FLYWHEEL" title="The flywheel keeps growing" copy="A flywheel to assure returns to investors and to builders using PAN." align="center" /></Reveal>
+      <div className="home-flywheel-layout">
+        <Reveal className="home-flywheel-copy">
+          <article><span><CircleDollarSign /></span><div><strong>50%</strong><p>of protocol revenue will be used for buybacks of the $PAN token.</p></div></article>
+          <article><span><Coins /></span><div><strong>35%</strong><p>of protocol revenue will fund builder incentives, competitions and community events.</p></div></article>
+          <p>Attract builders to build with PAN, grow the PAN ecosystem and strategically acquire the main token using protocol revenue.</p>
         </Reveal>
-        <div className="home-token-cards">
-          <Reveal className="delay-1"><article><span><CircleDollarSign /></span><div><small>CORE UTILITY</small><h3>Credits used for AI</h3><p>$PAN can be used to fund PAN credits. Whenever a user purchases credits, PAN tokens are burned or bought back, connecting product usage directly to the token.</p></div></article></Reveal>
-          <Reveal className="delay-2"><article><span><Coins /></span><div><small>COMMUNITY</small><h3>Rewards participation</h3><p>Community campaigns can reward useful attention, content and participation with $PAN, credits or both.</p></div></article></Reveal>
-          <Reveal className="delay-3"><article><span><Rocket /></span><div><small>LONG-TERM UTILITY</small><h3>More value as PAN expands</h3><p>As new capabilities are added, the token can support a wider set of creation, launch and project management functions.</p></div></article></Reveal>
-        </div>
+        <Reveal className="home-flywheel-visual delay-2">
+          <div className="flywheel-core"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><b>PAN</b><small>GROWTH LOOP</small></div>
+          <div className="flywheel-track" />
+          {flywheelSteps.map((step, index) => <div className={`flywheel-step flywheel-step-${index + 1}`} key={step}><span>{index + 1}</span><p>{step}</p><ArrowRight /></div>)}
+        </Reveal>
       </div>
     </section>
 
@@ -276,6 +285,21 @@ export function HomePage() {
       </div>
     </section>
 
+    <section className="home-section home-hive-section">
+      <Reveal className="home-hive-copy"><SectionHeading eyebrow="THE BEEHIVE MODEL" title="Every builder makes PAN smarter." copy="PAN works like a shared hive: every serious project adds new questions, patterns and real product feedback. As the builder community expands, PAN can improve its tools and intelligence for the whole ecosystem without exposing private project data." />
+        <div className="home-hive-points"><p><strong>More builders</strong><span>More real launch and product use cases enter the ecosystem.</span></p><p><strong>Better intelligence</strong><span>PAN learns which tools, workflows and strategies builders actually need.</span></p><p><strong>A stronger hive</strong><span>Better capabilities attract the next wave of founders and products.</span></p></div>
+      </Reveal>
+      <Reveal className="home-hive-visual delay-2" aria-label="PAN beehive learning model">
+        <div className="hive-cell hive-cell-1"><Bot /><span>Shared AI</span></div>
+        <div className="hive-cell hive-cell-2"><Rocket /><span>Launches</span></div>
+        <div className="hive-cell hive-cell-3"><LineChart /><span>Signals</span></div>
+        <div className="hive-cell hive-cell-4"><Globe2 /><span>Products</span></div>
+        <div className="hive-cell hive-cell-5"><MessageSquareText /><span>Feedback</span></div>
+        <div className="hive-cell hive-cell-6"><WandSparkles /><span>New tools</span></div>
+        <i className="hive-pulse" />
+      </Reveal>
+    </section>
+
     <section className="home-final-cta">
       <div className="final-cta-glow" />
       <Reveal><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><span>PROJECT AGENT NETWORK</span><h2>Your next Robinhood Chain project starts with a conversation.</h2><p>Bring the idea. PAN helps turn it into something people can see, understand and remember.</p><div><Link className="home-primary-cta" to="/register">Start building with PAN<ArrowRight /></Link><Link className="home-secondary-cta" to="/login">Sign in</Link></div></Reveal>
@@ -283,7 +307,7 @@ export function HomePage() {
 
     <footer className="home-footer">
       <div><Link className="home-brand" to="/"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><span>PAN.AI</span></Link><p>The Robinhood Chain project agent.</p></div>
-      <div className="home-footer-links"><button onClick={() => scrollToSection("why-pan")}>Why PAN</button><button onClick={() => scrollToSection("tokenomics")}>Tokenomics</button><button onClick={() => scrollToSection("roadmap")}>Roadmap</button><Link to="/terms">Terms</Link><Link to="/privacy">Privacy</Link><Link to="/cookies">Cookies</Link></div>
+      <div className="home-footer-links"><Link to="/terms">Terms</Link><Link to="/privacy">Privacy</Link><Link to="/cookies">Cookies</Link></div>
       <SocialLinks compact />
       <small>© {new Date().getFullYear()} PAN.AI. Built for Robinhood Chain.</small>
     </footer>
