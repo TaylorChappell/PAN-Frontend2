@@ -115,6 +115,10 @@ function fileLanguage(path) {
   return languageByExtension[extension] || "plain";
 }
 
+function promptNeedsBackend(value) {
+  return /\b(?:global|shared|multi-user|multiuser|persistent|database|backend|server-side|all users|every user|login|accounts?)\b|\b(?:store|save|sync)\b[^.]{0,50}\b(?:users?|visitors?|devices?)\b/i.test(value);
+}
+
 function fileIcon(path) {
   const extension = path.split(".").pop()?.toLowerCase();
   if (extension === "json") return <FileJson />;
@@ -269,6 +273,7 @@ export function WebsiteBuilderPage() {
   const [error, setError] = useState("");
   const [deployOpen, setDeployOpen] = useState(false);
   const [envOpen, setEnvOpen] = useState(false);
+  const previewFrameRef = useRef(null);
   const [envRows, setEnvRows] = useState([{ key: "", value: "", description: "", secret: true, configured: false }]);
   const [github, setGithub] = useState(null);
   const [exporting, setExporting] = useState(false);
@@ -323,6 +328,22 @@ export function WebsiteBuilderPage() {
     });
     return () => { active = false; };
   }, [envOpen, projectId, site?.id, site?.status]);
+  useEffect(() => {
+    if (!projectId || !site?.id) return undefined;
+    const handlePreviewRequest = async (event) => {
+      if (event.source !== previewFrameRef.current?.contentWindow || event.data?.type !== "pan-preview-request") return;
+      const source = event.source;
+      const requestId = event.data.requestId;
+      try {
+        const body = await endpoints.sites.previewRequest(projectId, { versionId: site.id, method: event.data.method, path: event.data.path, body: event.data.body });
+        source?.postMessage({ type: "pan-preview-response", requestId, status: 200, body }, "*");
+      } catch (requestError) {
+        source?.postMessage({ type: "pan-preview-response", requestId, status: requestError.status || 500, body: requestError.data || { error: requestError.message } }, "*");
+      }
+    };
+    window.addEventListener("message", handlePreviewRequest);
+    return () => window.removeEventListener("message", handlePreviewRequest);
+  }, [projectId, site?.id]);
 
   const currentFile = site?.files?.find((file) => file.path === selected) || site?.files?.[0];
   const fileTree = useMemo(() => buildFileTree(site?.files || []), [site?.files]);
@@ -342,10 +363,11 @@ export function WebsiteBuilderPage() {
     setError("");
     try {
       const id = await ensureSite();
+      const fullstack = site.runtime === "railway_node" || promptNeedsBackend(prompt);
       const data = await endpoints.sites.run(id, {
-        prompt: `${prompt.trim()}\n\nBuild the frontend in React with TypeScript. If backend functionality is needed, implement the backend in TypeScript.`,
+        prompt: `${prompt.trim()}\n\nBuild the frontend in React with TypeScript. If backend functionality is needed, implement the backend in TypeScript. Never fabricate dynamic counts or metrics, and do not use em dashes anywhere in the website.`,
         performance: "medium",
-        runtime: site.runtime === "railway_node" ? "fullstack" : "static",
+        runtime: fullstack ? "fullstack" : "static",
         basedOnVersionId: site.id || undefined,
       });
       const next = normalizeSite({ ...data, projectId });
@@ -418,7 +440,7 @@ export function WebsiteBuilderPage() {
       </aside>
       <section className="builder-canvas">
         <div className="canvas-tabs"><div><button className={view === "preview" ? "active" : ""} onClick={() => setView("preview")}><Eye/>Preview</button><button className={view === "code" ? "active" : ""} onClick={() => setView("code")}><Code2/>Code</button></div><span>{building ? <><LoaderCircle className="spin"/>Build in progress</> : site.status === "failed" ? <>Build failed</> : <><Check/>Up to date</>}</span></div>
-        {view === "preview" ? <div className="site-preview"><div className="browser-bar"><i/><i/><i/><span>{site.previewUrl || "pan-preview.local"}</span><ArrowUpRight/></div><iframe title="Website preview" sandbox="allow-scripts allow-forms allow-modals" srcDoc={previewHtml}/>{building ? <div className="preview-building-overlay"><LoaderCircle className="spin"/><strong>Building website</strong><small>The preview will refresh when validation finishes.</small></div> : null}</div> : <div className="code-workspace">
+        {view === "preview" ? <div className="site-preview"><div className="browser-bar"><i/><i/><i/><span>{site.previewUrl || (site.runtime === "railway_node" ? "pan-preview.local · backend bridge active" : "pan-preview.local")}</span><ArrowUpRight/></div><iframe ref={previewFrameRef} title="Website preview" sandbox="allow-scripts allow-forms allow-modals" srcDoc={previewHtml}/>{building ? <div className="preview-building-overlay"><LoaderCircle className="spin"/><strong>Building website</strong><small>The preview will refresh when validation finishes.</small></div> : null}</div> : <div className="code-workspace">
           <aside className="code-file-tree"><header><span>EXPLORER</span><small>{site.files.length} files</small></header><FileTree nodes={fileTree} expanded={expanded} selected={currentFile?.path} onToggle={(path) => setExpanded((old) => { const next = new Set(old); if (next.has(path)) next.delete(path); else next.add(path); return next; })} onSelect={setSelected}/></aside>
           <section><header><span><FileCode2 />{currentFile?.path}</span><div><small>{fileLanguage(currentFile?.path || "").toUpperCase()}</small><Button variant="ghost" onClick={saveFile} loading={running}><Save/>Save</Button></div></header><CodeEditor path={currentFile?.path} value={currentFile?.content || ""} onChange={updateFile} disabled={!currentFile || building}/><footer><span>Tab to indent</span><span>Shift + Tab to outdent</span><span>{currentFile?.content?.split("\n").length || 0} lines</span></footer></section>
         </div>}

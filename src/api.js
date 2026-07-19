@@ -181,6 +181,7 @@ export const endpoints = {
     },
     env: (projectId) => api(`/api/projects/${encodeURIComponent(projectId)}/environment`),
     setEnv: async (projectId, payload) => Promise.all(payload.variables.map((variable) => api(`/api/projects/${encodeURIComponent(projectId)}/environment`, { method: "POST", body: json(variable) }))),
+    previewRequest: (projectId, payload) => api(`/api/projects/${encodeURIComponent(projectId)}/website/preview`, { method: "POST", body: json(payload) }),
     githubStatus: async () => {
       const result = await api("/api/github/connection");
       return { ...result, connected: Boolean(result?.connection), username: result?.connection?.login, login: result?.connection?.login };

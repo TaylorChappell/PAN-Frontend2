@@ -24,25 +24,21 @@ import {
 const featureCards = [
   {
     icon: Bot,
-    eyebrow: "CHAIN-NATIVE INTELLIGENCE",
     title: "An AI built around Robinhood Chain",
     copy: "PAN focuses on the ecosystem you are actually launching into, helping with the coin, positioning, creative direction and launch decisions from one conversation.",
   },
   {
     icon: Layers3,
-    eyebrow: "ONE WORKSPACE",
     title: "The entire project stays connected",
     copy: "Your brief, coin details, imagery, website, launch preparation and live status all remain together instead of being scattered across unrelated tools.",
   },
   {
     icon: WandSparkles,
-    eyebrow: "IDEA TO EXECUTION",
     title: "Build without wrestling with every step",
     copy: "Explain what you want in plain English. PAN turns the idea into something structured, polished and ready to move toward market.",
   },
   {
     icon: Zap,
-    eyebrow: "ALWAYS IMPROVING",
     title: "A product designed to get smarter",
     copy: "PAN will keep expanding with stronger intelligence, more creative tools and deeper support for projects across Robinhood Chain.",
   },
@@ -50,22 +46,18 @@ const featureCards = [
 
 const roadmap = [
   {
-    phase: "LIVE NOW",
     title: "Launch workspace",
     copy: "PAN already has a deep understanding of Robinhood Chain, how launches behave and what helps coins stand out. It combines user feedback and questions with its own research tools so its knowledge keeps expanding. PAN can already plan launches, create coin visuals and build complete frontend and backend websites for projects.",
   },
   {
-    phase: "BUILDER GROWTH",
     title: "Builder incentives and community rewards",
     copy: "PAN will direct protocol revenue and fees towards incentives for customers building successful, working products with PAN. Strategic builder incentives will attract more builders to the ecosystem, creating more products, more usage and more protocol revenue.",
   },
   {
-    phase: "CREATION LAYER",
     title: "More creation tools & smarter intelligence",
     copy: "PAN will constantly improve and add more creation tools for developers, including an AI treasury assistant, analytics, marketing plans and community management tools. Its intelligence for token launches and strategies will deepen as it learns more about Robinhood Chain day by day.",
   },
   {
-    phase: "COMMUNITY SCALE",
     title: "Airdrop & Hackathon",
     copy: "Once PAN is established within the Pons ecosystem, it will host its own hackathon to bring more advanced builders onto the platform, alongside strategic token airdrops for participants from the community.",
   },
@@ -89,9 +81,8 @@ function Reveal({ className = "", children, ...props }) {
   return <div className={`home-reveal ${className}`} {...props}>{children}</div>;
 }
 
-function SectionHeading({ eyebrow, title, copy, align = "left" }) {
+function SectionHeading({ title, copy, align = "left" }) {
   return <div className={`home-section-heading ${align === "center" ? "center" : ""}`}>
-    <span>{eyebrow}</span>
     <h2>{title}</h2>
     {copy ? <p>{copy}</p> : null}
   </div>;
@@ -212,14 +203,14 @@ export function HomePage() {
 
 
     <section className="home-section home-intro" id="why-pan">
-      <Reveal><SectionHeading eyebrow="BUILT FOR A BETTER LAUNCH" title="One focused AI for the whole project." copy="Most coin launches are fragmented across research, design, websites, wallets and launch tools. PAN brings the important parts into one clear workflow built around Robinhood Chain." align="center" /></Reveal>
+      <Reveal><SectionHeading title="One focused AI for the whole project." copy="Most coin launches are fragmented across research, design, websites, wallets and launch tools. PAN brings the important parts into one clear workflow built around Robinhood Chain." align="center" /></Reveal>
       <div className="home-feature-grid">
-        {featureCards.map(({ icon: Icon, eyebrow, title, copy }, index) => <Reveal className={`home-feature-card delay-${index + 1}`} key={title}><article><span className="home-feature-icon"><Icon /></span><small>{eyebrow}</small><h3>{title}</h3><p>{copy}</p><i className="home-card-line" /></article></Reveal>)}
+        {featureCards.map(({ icon: Icon, title, copy }, index) => <Reveal className={`home-feature-card delay-${index + 1}`} key={title}><article><span className="home-feature-icon"><Icon /></span><h3>{title}</h3><p>{copy}</p><i className="home-card-line" /></article></Reveal>)}
       </div>
     </section>
 
     <section className="home-section home-workflow" id="how-it-works">
-      <Reveal className="home-workflow-copy"><SectionHeading eyebrow="HOW IT WORKS" title="Go from a rough idea to a real project." copy="You do not need to arrive with every detail worked out. Start with the idea and PAN helps shape the rest." />
+      <Reveal className="home-workflow-copy"><SectionHeading title="Go from a rough idea to a real project." copy="You do not need to arrive with every detail worked out. Start with the idea and PAN helps shape the rest." />
         <div className="home-workflow-list">
           <article><span>01</span><div><h3>Describe what you want to build</h3><p>Give PAN the concept, style, audience or even just the feeling you want the coin to have.</p></div></article>
           <article><span>02</span><div><h3>Build the project in one workspace</h3><p>Develop the identity, coin details, visual assets and website while PAN keeps everything aligned.</p></div></article>
@@ -243,12 +234,12 @@ export function HomePage() {
 
     <section className="home-section home-pons-section">
       <Reveal className="home-pons-card">
-        <div className="home-pons-copy"><span className="home-pons-icon"><Rocket /></span><div><small>CHOSEN LAUNCHPAD</small><h2>PAN launches with Pons.</h2><p>Pons is the launchpad PAN is being built around for Robinhood Chain. The goal is a cleaner path from the project workspace to a live coin, without making users stitch the process together themselves.</p><a href={ponsUrl} target="_blank" rel="noreferrer">Explore $PAN on Pons<ExternalLink /></a></div></div>
+        <div className="home-pons-copy"><span className="home-pons-icon"><Rocket /></span><div><h2>PAN launches with Pons.</h2><p>Pons is the launchpad PAN is being built around for Robinhood Chain. The goal is a cleaner path from the project workspace to a live coin, without making users stitch the process together themselves.</p><a href={ponsUrl} target="_blank" rel="noreferrer">Explore $PAN on Pons<ExternalLink /></a></div></div>
       </Reveal>
     </section>
 
     <section className="home-section home-tokenomics" id="tokenomics">
-      <Reveal><SectionHeading eyebrow="$PAN FLYWHEEL" title="The flywheel keeps growing" copy="A flywheel to assure returns to investors and to builders using PAN." align="center" /></Reveal>
+      <Reveal><SectionHeading title="The flywheel keeps growing" copy="A flywheel to assure returns to investors and to builders using PAN." align="center" /></Reveal>
       <div className="home-flywheel-layout">
         <Reveal className="home-flywheel-copy">
           <article><span><CircleDollarSign /></span><div><strong>50%</strong><p>of protocol revenue will be used for buybacks of the $PAN token.</p></div></article>
@@ -256,29 +247,29 @@ export function HomePage() {
           <p>Attract builders to build with PAN, grow the PAN ecosystem and strategically acquire the main token using protocol revenue.</p>
         </Reveal>
         <Reveal className="home-flywheel-visual delay-2">
-          <div className="flywheel-core"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><b>PAN</b><small>GROWTH LOOP</small></div>
+          <div className="flywheel-core"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><b>PAN</b></div>
           <div className="flywheel-track" />
           <div className="flywheel-energy-ring" aria-hidden="true" />
           <span className="flywheel-hover-hint"><i />Hover or focus each step</span>
           {flywheelSteps.map(({ title, icon: Icon }, index) => <button type="button" className={`flywheel-step flywheel-step-${index + 1}`} style={{ "--pulse-delay": `${index * 2}s` }} aria-label={`Step ${index + 1}: ${title}`} aria-describedby={`flywheel-tooltip-${index + 1}`} key={title}>
             <span className="flywheel-step-number">{index + 1}</span>
             <Icon />
-            <span className="flywheel-step-tooltip" id={`flywheel-tooltip-${index + 1}`} role="tooltip"><small>STEP {String(index + 1).padStart(2, "0")}</small><strong>{title}</strong></span>
+            <span className="flywheel-step-tooltip" id={`flywheel-tooltip-${index + 1}`} role="tooltip"><strong>{title}</strong></span>
           </button>)}
         </Reveal>
       </div>
     </section>
 
     <section className="home-section home-roadmap" id="roadmap">
-      <Reveal><SectionHeading eyebrow="THE DIRECTION" title="PAN is only getting started." copy="The product will continue to expand around a simple goal: make it dramatically easier to create and operate a strong Robinhood Chain project." /></Reveal>
+      <Reveal><SectionHeading title="PAN is only getting started." copy="The product will continue to expand around a simple goal: make it dramatically easier to create and operate a strong Robinhood Chain project." /></Reveal>
       <div className="home-roadmap-list">
-        {roadmap.map(({ phase, title, copy }, index) => {
+        {roadmap.map(({ title, copy }, index) => {
           const isOpen = openRoadmap === index;
           return <Reveal className={`delay-${index + 1}`} key={title}>
             <article className={isOpen ? "open" : ""}>
               <button type="button" onClick={() => setOpenRoadmap(isOpen ? -1 : index)} aria-expanded={isOpen}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
-                <div><small>{phase}</small><h3>{title}</h3></div>
+                <div><h3>{title}</h3></div>
                 {index === 0 ? <em><i />Active</em> : null}
                 <ChevronRight className="roadmap-chevron" />
               </button>
@@ -290,7 +281,7 @@ export function HomePage() {
     </section>
 
     <section className="home-section home-hive-section">
-      <Reveal className="home-hive-copy"><SectionHeading eyebrow="THE BEEHIVE MODEL" title="Every builder makes PAN smarter." copy="PAN works like a shared hive: every serious project adds new questions, patterns and real product feedback. As the builder community expands, PAN can improve its tools and intelligence for the whole ecosystem without exposing private project data." />
+      <Reveal className="home-hive-copy"><SectionHeading title="Every builder makes PAN smarter." copy="PAN works like a shared hive: every serious project adds new questions, patterns and real product feedback. As the builder community expands, PAN can improve its tools and intelligence for the whole ecosystem without exposing private project data." />
         <div className="home-hive-points"><p><strong>More builders</strong><span>More real launch and product use cases enter the ecosystem.</span></p><p><strong>Better intelligence</strong><span>PAN learns which tools, workflows and strategies builders actually need.</span></p><p><strong>A stronger hive</strong><span>Better capabilities attract the next wave of founders and products.</span></p></div>
       </Reveal>
       <Reveal className="home-hive-visual delay-2" aria-label="PAN beehive learning model">
@@ -305,7 +296,7 @@ export function HomePage() {
 
     <section className="home-final-cta">
       <div className="final-cta-glow" />
-      <Reveal><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><span>PROJECT AGENT NETWORK</span><h2>Your next Robinhood Chain project starts with a conversation.</h2><p>Bring the idea. PAN helps turn it into something people can see, understand and remember.</p><div><Link className="home-primary-cta" to="/register">Start building with PAN<ArrowRight /></Link><Link className="home-secondary-cta" to="/login">Sign in</Link></div></Reveal>
+      <Reveal><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><h2>Your next Robinhood Chain project starts with a conversation.</h2><p>Bring the idea. PAN helps turn it into something people can see, understand and remember.</p><div><Link className="home-primary-cta" to="/register">Start building with PAN<ArrowRight /></Link><Link className="home-secondary-cta" to="/login">Sign in</Link></div></Reveal>
     </section>
 
     <footer className="home-footer">
