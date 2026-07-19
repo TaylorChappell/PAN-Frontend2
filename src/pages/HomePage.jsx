@@ -117,14 +117,13 @@ function HeroVisual() {
       <div className="hero-window-bar">
         <span><i /><i /><i /></span>
         <small>PAN PROJECT WORKSPACE</small>
-        <em>ONLINE</em>
       </div>
       <div className="hero-workspace-body">
         <aside>
           <div className="hero-mini-brand"><img src={`${base}PanLogo.png`} alt="PAN.AI" /><b>PAN.AI</b></div>
           <span className="hero-side-button"><i>+</i>New project</span>
           <small>PROJECTS</small>
-          <div className="hero-project active"><img src={`${base}PanLogo.png`} alt="" /><div><b>PAN.AI</b><small>Ready to launch</small></div></div>
+          <div className="hero-project active"><img src={`${base}PanLogo.png`} alt="" /><div><b>PAN.AI</b></div></div>
           <div className="hero-project"><img src={`${base}robinhood.png`} alt="" /><div><b>Night Runner</b><small>Draft</small></div></div>
           <div className="hero-side-lines"><i /><i /><i /></div>
         </aside>
@@ -140,7 +139,7 @@ function HeroVisual() {
           <div className="hero-compose"><MessageSquareText /><span>Ask PAN to build, change or launch anything...</span><button><ArrowRight /></button></div>
         </section>
         <aside className="hero-details">
-          <header><small>COIN DETAILS</small><em>Ready</em></header>
+          <header><small>COIN DETAILS</small></header>
           <div className="hero-coin-image"><img src={`${base}PanLogo.png`} alt="PAN.AI coin logo" /></div>
           <label><small>COIN NAME</small><span>PAN.AI</span></label>
           <label><small>TICKER</small><span>PAN</span></label>
@@ -260,7 +259,6 @@ export function HomePage() {
           <div className="flywheel-core"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><b>PAN</b><small>GROWTH LOOP</small></div>
           <div className="flywheel-track" />
           <div className="flywheel-energy-ring" aria-hidden="true" />
-          <div className="flywheel-energy-runner" aria-hidden="true"><i /></div>
           <span className="flywheel-hover-hint"><i />Hover or focus each step</span>
           {flywheelSteps.map(({ title, icon: Icon }, index) => <button type="button" className={`flywheel-step flywheel-step-${index + 1}`} style={{ "--pulse-delay": `${index}s` }} aria-label={`Step ${index + 1}: ${title}`} aria-describedby={`flywheel-tooltip-${index + 1}`} key={title}>
             <span className="flywheel-step-number">{index + 1}</span>
@@ -302,7 +300,6 @@ export function HomePage() {
         <div className="hive-cell hive-cell-4"><Globe2 /><span>Products</span></div>
         <div className="hive-cell hive-cell-5"><MessageSquareText /><span>Feedback</span></div>
         <div className="hive-cell hive-cell-6"><WandSparkles /><span>New tools</span></div>
-        <i className="hive-pulse" />
       </Reveal>
     </section>
 
