@@ -260,7 +260,7 @@ export function HomePage() {
           <div className="flywheel-track" />
           <div className="flywheel-energy-ring" aria-hidden="true" />
           <span className="flywheel-hover-hint"><i />Hover or focus each step</span>
-          {flywheelSteps.map(({ title, icon: Icon }, index) => <button type="button" className={`flywheel-step flywheel-step-${index + 1}`} style={{ "--pulse-delay": `${index}s` }} aria-label={`Step ${index + 1}: ${title}`} aria-describedby={`flywheel-tooltip-${index + 1}`} key={title}>
+          {flywheelSteps.map(({ title, icon: Icon }, index) => <button type="button" className={`flywheel-step flywheel-step-${index + 1}`} style={{ "--pulse-delay": `${index * 2}s` }} aria-label={`Step ${index + 1}: ${title}`} aria-describedby={`flywheel-tooltip-${index + 1}`} key={title}>
             <span className="flywheel-step-number">{index + 1}</span>
             <Icon />
             <span className="flywheel-step-tooltip" id={`flywheel-tooltip-${index + 1}`} role="tooltip"><small>STEP {String(index + 1).padStart(2, "0")}</small><strong>{title}</strong></span>
