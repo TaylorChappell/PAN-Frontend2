@@ -119,6 +119,10 @@ function promptNeedsBackend(value) {
   return /\b(?:global|shared|multi-user|multiuser|persistent|database|backend|server-side|all users|every user|login|accounts?)\b|\b(?:store|save|sync)\b[^.]{0,50}\b(?:users?|visitors?|devices?)\b/i.test(value);
 }
 
+function isOptionalDatabaseUrl(row) {
+  return row?.key?.trim().toUpperCase() === "DATABASE_URL";
+}
+
 function fileIcon(path) {
   const extension = path.split(".").pop()?.toLowerCase();
   if (extension === "json") return <FileJson />;
@@ -350,7 +354,7 @@ export function WebsiteBuilderPage() {
   const previewHtml = useMemo(() => site?.previewHtml || site?.files?.find((file) => file.path === "pan-preview.html")?.content || site?.files?.find((file) => /(?:^|\/)index\.html$/.test(file.path))?.content || "", [site]);
   const building = running || ["queued", "generating"].includes(site?.status);
   const definedEnvironment = envRows.filter((row) => row.key);
-  const missingEnvironment = definedEnvironment.filter((row) => !row.configured);
+  const missingEnvironment = definedEnvironment.filter((row) => !row.configured && !isOptionalDatabaseUrl(row));
 
   const ensureSite = async () => {
     if (!projectId) throw new Error("A project is required for Website Studio.");
@@ -425,13 +429,13 @@ export function WebsiteBuilderPage() {
     {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
     <div className="builder-workspace">
       <aside className="builder-chat">
-        <div className="builder-agent"><span><SparkIcon/></span><div><small>PAN BUILDER</small><p>Websites use React and TypeScript by default. When a backend is needed, PAN generates it in TypeScript too.</p><em>REACT + TYPESCRIPT</em></div></div>
+        <div className="builder-agent"><span><SparkIcon/></span><div><small>PAN BUILDER</small><p>Full-stack previews can use PAN’s built-in Studio database. Exported backends use built-in SQLite by default or PostgreSQL when you add DATABASE_URL.</p><em>REACT + TYPESCRIPT</em></div></div>
         <div className="builder-history">
           {building ? <div className="builder-progress-card"><LoaderCircle className="spin"/><span><small>BUILD IN PROGRESS</small><p>PAN is generating, validating and saving the complete folder structure.</p></span></div> : null}
           {definedEnvironment.length ? <div className="builder-env-card">
             <header><span><KeyRound/></span><div><small>ENVIRONMENT SETUP</small><strong>{missingEnvironment.length ? `${missingEnvironment.length} value${missingEnvironment.length === 1 ? "" : "s"} required` : "All values configured"}</strong></div></header>
-            <p>These exact variables must be configured before the features that use them will work.</p>
-            <div className="builder-env-list">{definedEnvironment.map((row) => <div key={row.key}><code>{row.key}</code><span>{row.description || "Add the value supplied by this feature’s provider."}</span><em className={row.configured ? "configured" : "required"}>{row.configured ? "Configured" : "Value required"}</em></div>)}</div>
+            <p>Required provider values must be configured. DATABASE_URL is optional because leaving it blank selects the built-in database.</p>
+            <div className="builder-env-list">{definedEnvironment.map((row) => <div key={row.key}><code>{row.key}</code><span>{row.description || "Add the value supplied by this feature’s provider."}</span><em className={row.configured || isOptionalDatabaseUrl(row) ? "configured" : "required"}>{row.configured ? "Configured" : isOptionalDatabaseUrl(row) ? "Built-in database" : "Value required"}</em></div>)}</div>
             <Button variant="secondary" onClick={() => setEnvOpen(true)}><KeyRound/>{missingEnvironment.length ? "Set required values" : "Review variables"}</Button>
           </div> : null}
           {site.runs?.map((runItem) => <div key={runItem.id}><small>{runItem.status}</small><p>{runItem.prompt}</p></div>)}
@@ -447,14 +451,14 @@ export function WebsiteBuilderPage() {
       </section>
     </div>
     {envOpen ? <Modal wide title="Environment setup" subtitle="PAN encrypts saved values. Secrets are never included in GitHub exports or downloaded ZIP files." onClose={() => setEnvOpen(false)}><div className="modal-body">
-      <Notice>Use Railway for demanding or always-on backends. PAN’s built-in backend is rate-limited and intended for lightweight APIs.</Notice>
-      <section className="env-setup-steps"><h3>How to make the generated site work</h3><ol><li>Read <strong>What to enter</strong> for each variable, then obtain that value from the named provider.</li><li>Paste each value below and save it in PAN. A configured secret stays hidden; enter it again only when replacing it.</li><li>When deploying, open <strong>Railway → Service → Variables</strong>, add the same exact names and values, then redeploy. GitHub and ZIP exports keep placeholders only.</li></ol></section>
+      <Notice>Database previews run against PAN’s isolated built-in Studio database. Leave DATABASE_URL blank to use built-in SQLite after export, or enter a PostgreSQL URL to switch the hosted backend to your own database.</Notice>
+      <section className="env-setup-steps"><h3>How to make the generated site work</h3><ol><li>Read <strong>What to enter</strong> for each variable. DATABASE_URL is optional; other variables marked required need a provider value.</li><li>Paste required values below and save them in PAN. A configured secret stays hidden; enter it again only when replacing it.</li><li>When deploying, add required values under <strong>Railway → Service → Variables</strong>. For the built-in SQLite database, leave DATABASE_URL unset and attach a Railway volume. For PostgreSQL, set DATABASE_URL and redeploy.</li></ol></section>
       <div className="env-table">
         <div><span>Name</span><span>What to enter</span><span>Value</span><span>Secret</span></div>
         {envRows.map((row, index) => <div key={`${row.key}-${index}`}>
           <input aria-label={`Environment variable ${index + 1} name`} value={row.key} onChange={(event) => setEnvRows(envRows.map((item, itemIndex) => itemIndex === index ? { ...item, key: event.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "") } : item))} placeholder="API_KEY"/>
-          <div className="env-description"><textarea aria-label={`${row.key || `Variable ${index + 1}`} instructions`} value={row.description} onChange={(event) => setEnvRows(envRows.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="Where to get this value and its expected format"/><small className={row.configured ? "configured" : "required"}>{row.configured ? "Configured" : "Value required"}</small></div>
-          <input aria-label={`${row.key || `Variable ${index + 1}`} value`} type={row.secret ? "password" : "text"} value={row.value} onChange={(event) => setEnvRows(envRows.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} placeholder={row.configured ? "Configured — enter only to replace" : "Paste required value"}/>
+          <div className="env-description"><textarea aria-label={`${row.key || `Variable ${index + 1}`} instructions`} value={row.description} onChange={(event) => setEnvRows(envRows.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="Where to get this value and its expected format"/><small className={row.configured || isOptionalDatabaseUrl(row) ? "configured" : "required"}>{row.configured ? "Configured" : isOptionalDatabaseUrl(row) ? "Optional, built-in database active" : "Value required"}</small></div>
+          <input aria-label={`${row.key || `Variable ${index + 1}`} value`} type={row.secret ? "password" : "text"} value={row.value} onChange={(event) => setEnvRows(envRows.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} placeholder={row.configured ? "Configured, enter only to replace" : isOptionalDatabaseUrl(row) ? "Blank uses the built-in database" : "Paste required value"}/>
           <label className="env-secret"><input type="checkbox" checked={row.secret} onChange={(event) => setEnvRows(envRows.map((item, itemIndex) => itemIndex === index ? { ...item, secret: event.target.checked } : item))}/><span>Secret</span></label>
         </div>)}
       </div>
