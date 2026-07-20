@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { ArrowUpRight, CheckCircle2, Coins, Earth, Image as ImageIcon, LoaderCircle, MessageSquare, Paperclip, Rocket, Send, Sparkles, Upload, Wallet, X } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Coins, Earth, Image as ImageIcon, LoaderCircle, MessageSquare, Paperclip, Rocket, Send, SlidersHorizontal, Sparkles, Upload, Wallet, X } from "lucide-react";
 import { endpoints, mediaUrl } from "../api";
 import { Button, Modal, Notice, Skeleton, money } from "../components/UI";
 import { InlineMarkdown } from "../components/InlineMarkdown";
@@ -101,6 +101,8 @@ export function ProjectPage() {
   const [attachments, setAttachments] = useState([]);
   const [pendingCoinImage, setPendingCoinImage] = useState(null);
   const [error, setError] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsDragY, setDetailsDragY] = useState(0);
   const [launchOpen, setLaunchOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
   const [imagePrompt, setImagePrompt] = useState("");
@@ -111,8 +113,13 @@ export function ProjectPage() {
   const messageInput = useRef(null);
   const feedRef = useRef(null);
   const websiteNavigationRef = useRef(false);
+  const detailsSwipe = useRef(null);
 
   useEffect(() => { accountPerformanceRef.current = accountPerformance; }, [accountPerformance]);
+  useEffect(() => {
+    setDetailsOpen(false);
+    setDetailsDragY(0);
+  }, [projectId]);
 
   const mergeServerProject = useCallback((data) => {
     if (!data) return;
@@ -433,12 +440,43 @@ export function ProjectPage() {
     finally { setThinking(false); }
   };
 
+  const closeDetails = () => {
+    setDetailsDragY(0);
+    setDetailsOpen(false);
+  };
+
+  const startDetailsSwipe = (event) => {
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    detailsSwipe.current = { y: touch.clientY, time: performance.now() };
+  };
+
+  const moveDetailsSwipe = (event) => {
+    const start = detailsSwipe.current;
+    const touch = event.touches?.[0];
+    if (!start || !touch) return;
+    const distance = Math.max(0, touch.clientY - start.y);
+    if (distance > 0) event.preventDefault();
+    setDetailsDragY(distance);
+  };
+
+  const endDetailsSwipe = (event) => {
+    const start = detailsSwipe.current;
+    detailsSwipe.current = null;
+    if (!start) return;
+    const touch = event.changedTouches?.[0];
+    const distance = Math.max(0, (touch?.clientY || start.y) - start.y);
+    const elapsed = Math.max(1, performance.now() - start.time);
+    if (distance >= 78 || distance / elapsed >= 0.55) closeDetails();
+    else setDetailsDragY(0);
+  };
+
   if (loading) return <div className="page-loading"><Skeleton lines={6} /></div>;
 
   return (
     <div className="project-page">
       <section className="chat-column">
-        <header className="project-header"><div><h1>{project.coinName || project.name || "Untitled coin"}</h1><span className={`status-pill ${launched ? "live" : "draft"}`}>{launched ? "Live" : project.status || "Draft"}</span>{saving ? <small><LoaderCircle className="spin" />Saving</small> : null}</div><button className="studio-link" onClick={openWebsiteStudio}><Earth />Website studio</button></header>
+        <header className="project-header"><div><h1>{project.coinName || project.name || "Untitled coin"}</h1><span className={`status-pill ${launched ? "live" : "draft"}`}>{launched ? "Live" : project.status || "Draft"}</span>{saving ? <small><LoaderCircle className="spin" />Saving</small> : null}</div><span className="project-header-actions"><button className="mobile-details-button" onClick={() => setDetailsOpen(true)}><SlidersHorizontal />Details</button><button className="studio-link" onClick={openWebsiteStudio}><Earth />Web studio</button></span></header>
         <div className="chat-scroll-region">
           {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
           <div className="chat-feed" ref={feedRef} role="log" aria-label="AI chat messages" aria-live="polite" tabIndex={0}>
@@ -449,7 +487,9 @@ export function ProjectPage() {
         </div>
         <div className="composer-dock"><div className="composer" onPaste={handlePaste}>{attachments.length ? <div className="attachment-strip">{attachments.map((image) => <div key={image.id}><img src={image.dataUrl} alt={image.fileName} /><button aria-label={`Remove ${image.fileName}`} onClick={() => setAttachments((old) => old.filter((item) => item.id !== image.id))}><X /></button><span>{image.fileName}</span></div>)}</div> : null}<textarea ref={messageInput} rows="1" aria-label="Message PAN" placeholder="Message PAN…" value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} /><div><span><button aria-label="Attach images" title="Upload images" onClick={() => chatImageInput.current?.click()}><Paperclip /></button><button aria-label="Generate image" title="Generate image" onClick={() => setImageOpen(true)}><ImageIcon /></button><button aria-label="Open Website Studio" title="Website Studio" onClick={openWebsiteStudio}><Earth /></button><input ref={chatImageInput} hidden multiple type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { addChatImages(e.target.files); e.target.value = ""; }}/></span><span className="composer-actions"><label>Performance<select aria-label="Performance" value={project.performance} onChange={(e) => selectPerformance(e.target.value)}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="extra_high">Extra high</option></select></label><button className="send-button" disabled={(!message.trim() && !attachments.length) || thinking} onClick={() => send()} aria-label="Send"><Send /></button></span></div></div></div>
       </section>
-      <aside className="details-panel">
+      {detailsOpen ? <button className="details-sheet-backdrop" aria-label="Close coin details" onClick={closeDetails} /> : null}
+      <aside className={`details-panel ${detailsOpen ? "details-panel-open" : ""} ${detailsDragY > 0 ? "details-panel-dragging" : ""}`} style={detailsOpen && detailsDragY > 0 ? { transform: `translateY(${detailsDragY}px)` } : undefined}>
+        <div className="details-mobile-head" onTouchStart={startDetailsSwipe} onTouchMove={moveDetailsSwipe} onTouchEnd={endDetailsSwipe} onTouchCancel={() => { detailsSwipe.current = null; setDetailsDragY(0); }}><span /><strong>{launched ? "Coin stats" : "Coin details"}</strong><button onClick={closeDetails} aria-label="Close details"><X /></button></div>
         {launched ? <CoinStats project={project} /> : <><div className="panel-title"><div><p>PROJECT OBJECT</p><h2>Coin details</h2></div><span className="completion">{complete}/3</span></div>
           <button className={`image-upload ${project.imageUrl ? "has-image" : ""}`} onClick={() => coinImageInput.current?.click()}>{project.imageUrl ? <img src={mediaUrl(project.imageUrl)} alt="Coin" /> : <><Upload /><strong>Upload coin image</strong><small>PNG, JPG, WebP or GIF · required</small></>}</button><input ref={coinImageInput} hidden type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { readCoinImage(e.target.files?.[0]); e.target.value = ""; }}/>
           <div className="field-stack"><Field label="Name"><input value={project.coinName} onChange={(e) => persist({ coinName: e.target.value, name: e.target.value || "Untitled coin" })} placeholder="e.g. Neon Frog" /></Field><Field label="Ticker"><input maxLength="10" value={project.ticker} onChange={(e) => persist({ ticker: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") })} placeholder="e.g. NFRG" /></Field><Field label="Description" optional><textarea maxLength="256" value={project.description || ""} onChange={(e) => persist({ description: e.target.value })} placeholder="What is this coin about?" /></Field><Field label="Website" optional><input value={project.website || ""} onChange={(e) => persist({ website: e.target.value })} placeholder="https://coin.xyz" /></Field><Field label="X account" optional><input value={project.xAccount || ""} onChange={(e) => persist({ xAccount: e.target.value })} onBlur={() => { if (resolvedX.url && project.xAccount !== resolvedX.url) persist({ xAccount: resolvedX.url }); }} placeholder="@PanAiApp or x.com/PanAiApp" />{project.xAccount ? <small className={`resolved-social ${resolvedX.url ? "valid" : "invalid"}`}>{resolvedX.url ? <><CheckCircle2/><a href={resolvedX.url} target="_blank" rel="noreferrer">{resolvedX.url}</a></> : resolvedX.error}</small> : null}</Field><Field label="Telegram" optional><input value={project.telegram || ""} onChange={(e) => persist({ telegram: e.target.value })} onBlur={() => { if (resolvedTelegram.url && project.telegram !== resolvedTelegram.url) persist({ telegram: resolvedTelegram.url }); }} placeholder="@coincommunity or t.me/coincommunity" />{project.telegram ? <small className={`resolved-social ${resolvedTelegram.url ? "valid" : "invalid"}`}>{resolvedTelegram.url ? <><CheckCircle2/><a href={resolvedTelegram.url} target="_blank" rel="noreferrer">{resolvedTelegram.url}</a></> : resolvedTelegram.error}</small> : null}</Field></div>

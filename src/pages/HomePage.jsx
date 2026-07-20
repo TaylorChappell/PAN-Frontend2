@@ -13,12 +13,10 @@ import {
   Image,
   Layers3,
   LineChart,
-  Menu,
   MessageSquareText,
   Network,
   Rocket,
   WandSparkles,
-  X as CloseIcon,
   Zap,
 } from "lucide-react";
 
@@ -208,16 +206,18 @@ export function HomePage() {
     <header className="home-nav">
       <Link className="home-brand" to="/" aria-label="PAN.AI home"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><span>PAN.AI</span></Link>
       <nav className={menuOpen ? "open" : ""}>
-        <button onClick={() => navigateSection("product")}>Product</button>
-        <button onClick={() => navigateSection("why-pan")}>Why PAN</button>
-        <button onClick={() => navigateSection("tokenomics")}>Tokenomics</button>
-        <button onClick={() => navigateSection("roadmap")}>Roadmap</button>
+        <div className="home-mobile-nav-label">Explore PAN</div>
+        <button onClick={() => navigateSection("product")}><span>01</span>Product</button>
+        <button onClick={() => navigateSection("why-pan")}><span>02</span>Why PAN</button>
+        <button onClick={() => navigateSection("tokenomics")}><span>03</span>Tokenomics</button>
+        <button onClick={() => navigateSection("roadmap")}><span>04</span>Roadmap</button>
+        <div className="home-mobile-nav-actions"><Link to="/login" onClick={() => setMenuOpen(false)}>Sign in</Link><Link to="/register" onClick={() => setMenuOpen(false)}>Start building<ArrowRight /></Link></div>
       </nav>
       <div className="home-nav-actions">
         <Link className="home-nav-cta" to="/login">Sign in</Link>
         <Link className="home-sign-in" to="/register">Sign up</Link>
       </div>
-      <button className="home-menu-button" onClick={() => setMenuOpen((value) => !value)} aria-label="Toggle navigation">{menuOpen ? <CloseIcon /> : <Menu />}</button>
+      <button className={`home-menu-button ${menuOpen ? "open" : ""}`} onClick={() => setMenuOpen((value) => !value)} aria-label="Toggle navigation" aria-expanded={menuOpen}><span className="menu-glyph" aria-hidden="true"><i /><i /><i /></span></button>
     </header>
 
     <section className="home-hero" id="product">
