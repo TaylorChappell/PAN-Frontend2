@@ -1,4 +1,4 @@
-export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://pan-backend-production-8d86.up.railway.app").replace(/\/$/, "");
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://api.panapp.io").replace(/\/$/, "");
 
 export function mediaUrl(value) {
   if (!value || value.startsWith("data:") || value.startsWith("blob:") || /^https?:\/\//i.test(value)) return value || "";
