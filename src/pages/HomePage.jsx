@@ -10,7 +10,6 @@ import {
   Copy,
   ExternalLink,
   Globe2,
-  Image,
   Layers3,
   LineChart,
   MessageSquareText,
@@ -253,18 +252,6 @@ export function HomePage() {
         </div>
         <Link className="home-inline-link" to="/register">Create your first project<ArrowRight /></Link>
       </Reveal>
-      <Reveal className="home-workflow-graphic delay-2">
-        <div className="workflow-orbit">
-          <div className="workflow-core"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><span>PAN</span></div>
-          <div className="workflow-ring ring-one" />
-          <div className="workflow-ring ring-two" />
-          <span className="workflow-node node-one"><MessageSquareText /><b>Idea</b></span>
-          <span className="workflow-node node-two"><Image /><b>Brand</b></span>
-          <span className="workflow-node node-three"><Globe2 /><b>Website</b></span>
-          <span className="workflow-node node-four"><Rocket /><b>Pons</b></span>
-          <span className="workflow-node node-five"><LineChart /><b>Live</b></span>
-        </div>
-      </Reveal>
     </section>
 
     <section className="home-section home-pons-section">
@@ -292,7 +279,6 @@ export function HomePage() {
           <div className="flywheel-core"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /><b>PAN</b></div>
           <div className="flywheel-track" />
           <div className="flywheel-energy-ring" aria-hidden="true" />
-          <span className="flywheel-hover-hint"><i />Hover or focus each step</span>
           {flywheelSteps.map(({ title, icon: Icon }, index) => <button type="button" className={`flywheel-step flywheel-step-${index + 1}`} style={{ "--pulse-delay": `${index * 2}s` }} aria-label={`Step ${index + 1}: ${title}`} aria-describedby={`flywheel-tooltip-${index + 1}`} key={title}>
             <span className="flywheel-step-number">{index + 1}</span>
             <Icon />
