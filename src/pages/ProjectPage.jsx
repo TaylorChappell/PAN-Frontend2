@@ -40,8 +40,58 @@ function extractReply(data) {
 }
 
 function activeRunFrom(data) {
-  const run = data?.activeRun || data?.runs?.find((item) => ["queued", "running"].includes(item.status));
-  return run && ["queued", "running"].includes(run.status) ? run : null;
+  const runs = Array.isArray(data?.runs) ? data.runs.filter((item) => ["queued", "running"].includes(item?.status)) : [];
+  const explicit = data?.activeRun && ["queued", "running"].includes(data.activeRun.status) ? data.activeRun : null;
+  return runs.find((item) => item.kind === "image")
+    || runs.find((item) => item.kind === "website")
+    || explicit
+    || runs[0]
+    || null;
+}
+
+function attachmentIdentity(image) {
+  return image?.assetId || image?.id || image?.url || image?.dataUrl || image?.fileName || "";
+}
+
+function imageAttachmentIdentities(messages) {
+  return new Set((messages || []).flatMap((item) => (item.attachments || [])
+    .filter((image) => String(image?.mimeType || "").startsWith("image/") || image?.url || image?.dataUrl)
+    .map(attachmentIdentity)).filter(Boolean));
+}
+
+function hasNewAssistantImage(messages, baseline) {
+  return (messages || []).some((item) => item.role === "assistant" && (item.attachments || []).some((image) => {
+    const identity = attachmentIdentity(image);
+    return identity && !baseline.has(identity) && (String(image?.mimeType || "").startsWith("image/") || image?.url || image?.dataUrl);
+  }));
+}
+
+function mergeConversationMessages(serverMessages, localMessages) {
+  const server = Array.isArray(serverMessages) ? serverMessages : [];
+  const merged = [...server];
+  for (const local of localMessages || []) {
+    if (!local?.optimistic) continue;
+    const content = String(local.content || local.message || "").trim();
+    const duplicate = server.some((item) => item.role === local.role && String(item.content || item.message || "").trim() === content);
+    if (!duplicate && !merged.some((item) => item.id === local.id)) merged.push(local);
+  }
+  return merged;
+}
+
+function imageRunFromToolResult(data) {
+  const executions = Array.isArray(data?.toolExecutions) ? data.toolExecutions : [];
+  for (const execution of executions) {
+    if (execution?.name !== "pan_request_image" || execution.status === "failed") continue;
+    let output = execution.output;
+    if (typeof output === "string") {
+      try { output = JSON.parse(output); } catch { output = null; }
+    }
+    const runId = output?.runId;
+    if (runId && (output?.processing === true || output?.accepted === true || ["queued", "running"].includes(output?.status))) {
+      return { id: runId, kind: "image", status: ["queued", "running"].includes(output?.status) ? output.status : "queued" };
+    }
+  }
+  return null;
 }
 
 function activityForRun(run) {
@@ -131,6 +181,7 @@ export function ProjectPage() {
   const [launchOpen, setLaunchOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
   const [imagePrompt, setImagePrompt] = useState("");
+  const [imagePending, setImagePending] = useState(false);
   const [launch, setLaunch] = useState({ devBuyEth: "0", feeWalletAddress: "", walletMode: "account" });
   const saveTimer = useRef(null);
   const coinImageInput = useRef(null);
@@ -138,8 +189,14 @@ export function ProjectPage() {
   const messageInput = useRef(null);
   const feedRef = useRef(null);
   const websiteNavigationRef = useRef(false);
+  const projectRef = useRef(project);
+  const requestInFlightRef = useRef(null);
+  const pendingImageRef = useRef(null);
+  const imagePendingRef = useRef(false);
 
   useEffect(() => { accountPerformanceRef.current = accountPerformance; }, [accountPerformance]);
+  useEffect(() => { projectRef.current = project; }, [project]);
+  useEffect(() => { imagePendingRef.current = imagePending; }, [imagePending]);
 
   const mergeServerProject = useCallback((data) => {
     if (!data) return;
@@ -150,9 +207,31 @@ export function ProjectPage() {
     }
   }, [setProjects]);
 
+  const beginImagePending = useCallback(() => {
+    if (!pendingImageRef.current) {
+      pendingImageRef.current = {
+        startedAt: Date.now(),
+        baseline: imageAttachmentIdentities(projectRef.current?.messages || []),
+      };
+    }
+    imagePendingRef.current = true;
+    setImagePending(true);
+    setAiActivity("image");
+  }, []);
+
+  const finishImagePending = useCallback(() => {
+    pendingImageRef.current = null;
+    imagePendingRef.current = false;
+    setImagePending(false);
+  }, []);
+
   useEffect(() => {
     if (!projectId) {
       setProject({ ...blankProject, performance: accountPerformanceRef.current, messages: [] });
+      requestInFlightRef.current = null;
+      pendingImageRef.current = null;
+      imagePendingRef.current = false;
+      setImagePending(false);
       setThinking(false);
       setResumedRunId(null);
       setAiActivity("thinking");
@@ -163,17 +242,32 @@ export function ProjectPage() {
       setLoading(false);
       return;
     }
-    setLoading(true); setError("");
+    const hasLocalProject = projectRef.current?.id === projectId;
+    if (!hasLocalProject) setLoading(true);
+    setError("");
     endpoints.projects.get(projectId).then((data) => {
       const next = normalizeProject(data, accountPerformanceRef.current);
       const activeRun = activeRunFrom(data);
-      setProject(next);
-      setThinking(Boolean(activeRun));
-      setResumedRunId(activeRun?.id || null);
-      setAiActivity(activityForRun(activeRun));
+      setProject((old) => ({
+        ...next,
+        messages: old.id === next.id ? mergeConversationMessages(next.messages, old.messages) : next.messages,
+      }));
+      if (activeRun) {
+        setThinking(true);
+        setResumedRunId(activeRun.id || null);
+        setAiActivity(activityForRun(activeRun));
+        if (activeRun.kind === "image") beginImagePending();
+      } else if (requestInFlightRef.current) {
+        setThinking(true);
+        setAiActivity(requestInFlightRef.current.activity || "thinking");
+      } else if (!imagePendingRef.current) {
+        setThinking(false);
+        setResumedRunId(null);
+        setAiActivity("thinking");
+      }
       setProjects((old) => old.map((item) => (item.id || item.projectId) === next.id ? { ...item, ...projectFields(data), activeRun } : item));
     }).catch((e) => setError(e.message)).finally(() => setLoading(false));
-  }, [location.state?.newProjectNonce, projectId, setProjects]);
+  }, [beginImagePending, location.state?.newProjectNonce, projectId, setProjects]);
 
   useEffect(() => {
     setProject((old) => old.performance === accountPerformance ? old : { ...old, performance: accountPerformance });
@@ -190,26 +284,78 @@ export function ProjectPage() {
         const activeRun = activeRunFrom(latest);
         mergeServerProject(latest);
         setProjects((old) => old.map((item) => (item.id || item.projectId) === project.id ? { ...item, activeRun } : item));
-        if (activeRun) setAiActivity(activityForRun(activeRun));
-        else if (resumedRunId) {
+        if (activeRun) {
+          setAiActivity(activityForRun(activeRun));
+          setResumedRunId(activeRun.id || null);
+          if (activeRun.kind === "image") beginImagePending();
+        } else if (resumedRunId) {
           window.clearInterval(timer);
           const completed = await endpoints.projects.get(project.id);
           if (!active) return;
           const completedProject = normalizeProject(completed, accountPerformanceRef.current);
           const completedRun = completed?.runs?.find((run) => run.id === resumedRunId);
-          setProject(completedProject);
+          setProject((old) => ({ ...completedProject, messages: mergeConversationMessages(completedProject.messages, old.messages) }));
           setProjects((old) => old.map((item) => (item.id || item.projectId) === project.id ? { ...item, ...projectFields(completed), activeRun: null } : item));
           setThinking(false);
           setResumedRunId(null);
-          setAiActivity("thinking");
-          if (completedRun?.status === "failed") setError(completedRun.errorMessage || "PAN could not complete the request.");
+          if (!imagePendingRef.current) setAiActivity("thinking");
+          if (completedRun?.status === "failed") {
+            if (completedRun.kind === "image") finishImagePending();
+            setError(completedRun.errorMessage || "PAN could not complete the request.");
+          }
           reload();
         }
       } catch { /* The final run response still performs a source-of-truth refresh. */ }
     };
     const timer = window.setInterval(refresh, 1_500);
     return () => { active = false; window.clearInterval(timer); };
-  }, [mergeServerProject, project.id, reload, resumedRunId, setProjects, thinking]);
+  }, [beginImagePending, finishImagePending, mergeServerProject, project.id, reload, resumedRunId, setProjects, thinking]);
+  useEffect(() => {
+    if (!imagePending || !project.id) return undefined;
+    let active = true;
+    let timer = null;
+    const refreshImage = async () => {
+      try {
+        const latest = await endpoints.projects.get(project.id);
+        if (!active) return;
+        const next = normalizeProject(latest, accountPerformanceRef.current);
+        const baseline = pendingImageRef.current?.baseline || new Set();
+        setProject((old) => ({ ...next, messages: mergeConversationMessages(next.messages, old.messages) }));
+        const runs = Array.isArray(latest?.runs) ? latest.runs : [];
+        const activeImageRun = runs.find((run) => run.kind === "image" && ["queued", "running"].includes(run.status));
+        const latestImageRun = runs.find((run) => run.kind === "image");
+        if (hasNewAssistantImage(next.messages, baseline)) {
+          finishImagePending();
+          setThinking(false);
+          setResumedRunId(null);
+          setAiActivity("thinking");
+          reload();
+          return;
+        }
+        if (activeImageRun) {
+          setAiActivity("image");
+          setResumedRunId(activeImageRun.id || null);
+        } else if (latestImageRun && ["failed", "cancelled"].includes(latestImageRun.status)) {
+          finishImagePending();
+          setThinking(false);
+          setResumedRunId(null);
+          setAiActivity("thinking");
+          setError(latestImageRun.errorMessage || "PAN could not generate the image.");
+          return;
+        } else if (!requestInFlightRef.current && Date.now() - (pendingImageRef.current?.startedAt || Date.now()) > 45_000) {
+          finishImagePending();
+          setThinking(false);
+          setResumedRunId(null);
+          setAiActivity("thinking");
+          setError("PAN did not start the image job. Please try the request again.");
+          return;
+        }
+      } catch { /* Keep the visible image skeleton while a temporary refresh fails. */ }
+      if (active) timer = window.setTimeout(refreshImage, 1_500);
+    };
+    refreshImage();
+    return () => { active = false; if (timer) window.clearTimeout(timer); };
+  }, [finishImagePending, imagePending, project.id, reload]);
   useEffect(() => {
     if (!project.id || project.status !== "launching") return undefined;
     let active = true;
@@ -252,6 +398,8 @@ export function ProjectPage() {
   const resolvedX = useMemo(() => resolveSocialLink(project.xAccount, "x"), [project.xAccount]);
   const resolvedTelegram = useMemo(() => resolveSocialLink(project.telegram, "telegram"), [project.telegram]);
   const launched = project.status === "live" || project.status === "launched" || Boolean(project.contractAddress || project.tokenAddress);
+  const busy = thinking || imagePending;
+  const visibleActivity = imagePending ? "image" : aiActivity;
 
   const ensureProject = async () => {
     if (project.id) return project.id;
@@ -358,14 +506,18 @@ export function ProjectPage() {
   };
 
   const send = async (text = message, activityHint = null) => {
-    const clean = text.trim(); if ((!clean && !attachments.length) || thinking) return;
+    const clean = text.trim(); if ((!clean && !attachments.length) || thinking || imagePendingRef.current) return;
     const outgoingAttachments = attachments;
+    const initialActivity = initialActivityForPrompt(clean, activityHint);
     setError(""); setMessage(""); setAttachments([]);
-    const userMessage = { id: crypto.randomUUID(), role: "user", content: clean, attachments: outgoingAttachments };
+    const userMessage = { id: crypto.randomUUID(), role: "user", content: clean, attachments: outgoingAttachments, optimistic: true };
+    requestInFlightRef.current = { userMessageId: userMessage.id, activity: initialActivity, projectId: project.id || null };
     websiteNavigationRef.current = false;
-    setProject((old) => ({ ...old, messages: [...old.messages, userMessage] })); setAiActivity(initialActivityForPrompt(clean, activityHint)); setThinking(true);
+    if (initialActivity === "image") beginImagePending();
+    setProject((old) => ({ ...old, messages: [...old.messages, userMessage] })); setAiActivity(initialActivity); setThinking(true);
     try {
       const id = await ensureProject();
+      if (requestInFlightRef.current) requestInFlightRef.current.projectId = id;
       setProjects((old) => old.map((item) => (item.id || item.projectId) === id ? { ...item, activeRun: { id: `pending-${userMessage.id}`, projectId: id, kind: "chat", status: "queued" } } : item));
       const data = await endpoints.projects.message(id, {
         message: clean,
@@ -386,9 +538,11 @@ export function ProjectPage() {
               navigate(`/projects/${id}/website`, { state: { followWebsiteBuild: true } });
             }
           }
-          else if (imageActive) setAiActivity("image");
+          else if (imageActive) { beginImagePending(); setAiActivity("image"); }
         },
       });
+      const delegatedImageRun = imageRunFromToolResult(data);
+      if (delegatedImageRun) beginImagePending();
 
       let refreshed = null;
       try { refreshed = await endpoints.projects.get(id); }
@@ -397,31 +551,45 @@ export function ProjectPage() {
       if (refreshed) {
         const refreshedProject = normalizeProject(refreshed, accountPerformanceRef.current);
         const nextActiveRun = activeRunFrom(refreshed);
-        setProject(refreshedProject);
+        const effectiveRun = nextActiveRun || delegatedImageRun;
+        setProject((old) => ({ ...refreshedProject, messages: mergeConversationMessages(refreshedProject.messages, old.messages) }));
         setProjects((old) => old.map((item) => (item.id || item.projectId) === id
-          ? { ...item, ...projectFields(refreshed), activeRun: nextActiveRun }
+          ? { ...item, ...projectFields(refreshed), activeRun: effectiveRun }
           : item));
-        setThinking(Boolean(nextActiveRun));
-        setResumedRunId(nextActiveRun?.id || null);
-        setAiActivity(activityForRun(nextActiveRun));
+        setThinking(Boolean(effectiveRun));
+        setResumedRunId(effectiveRun?.id || null);
+        if (effectiveRun) {
+          setAiActivity(activityForRun(effectiveRun));
+          if (effectiveRun.kind === "image") beginImagePending();
+        } else if (imagePendingRef.current) {
+          setAiActivity("image");
+        } else {
+          setAiActivity("thinking");
+        }
       } else {
         const generatedAsset = data?.asset?.url ? { id: data.asset.id, url: data.asset.url, fileName: data.asset.originalName || "Generated image", mimeType: data.asset.contentType || "image/png" } : null;
         const assistantMessage = { id: data?.message?.id || data?.id || crypto.randomUUID(), role: "assistant", content: extractReply(data), attachments: generatedAsset ? [generatedAsset] : [] };
         setProject((old) => ({ ...old, messages: [...old.messages, assistantMessage] }));
-        setThinking(false);
-        setResumedRunId(null);
-        setAiActivity("thinking");
+        setThinking(Boolean(delegatedImageRun));
+        setResumedRunId(delegatedImageRun?.id || null);
+        setAiActivity(imagePendingRef.current ? "image" : "thinking");
       }
 
+      requestInFlightRef.current = null;
       reload();
       if (data?.website?.id && ["ready", "published"].includes(data.website.status)) navigate(`/projects/${id}/website/${data.website.id}`);
       else if (data?.website?.status === "failed") setError(data.website.errorMessage || "Website Studio could not complete the build.");
     } catch (e) {
-      setError(e.message);
+      requestInFlightRef.current = null;
+      const continuing = e?.status === 202 && imagePendingRef.current;
+      if (!continuing) {
+        setError(e.message);
+        if (initialActivity === "image") finishImagePending();
+      }
       setAttachments(outgoingAttachments);
       setThinking(false);
       setResumedRunId(null);
-      setAiActivity("thinking");
+      setAiActivity(imagePendingRef.current ? "image" : "thinking");
       reload();
     }
   };
@@ -481,16 +649,16 @@ export function ProjectPage() {
   return (
     <div className="project-page">
       <section className="chat-column">
-        <header className="project-header"><div><h1>{project.coinName || project.name || "Untitled coin"}</h1><span className={`status-pill ${launched ? "live" : "draft"}`}>{launched ? "Live" : project.status || "Draft"}</span>{saving ? <small><LoaderCircle className="spin" />Saving</small> : null}</div></header>
+        <header className="project-header"><div><h1>{project.coinName || project.name || "Untitled coin"}</h1><span className={`status-pill ${launched ? "live" : "draft"}`}>{launched ? "Live" : project.status || "Draft"}</span>{saving ? <small><LoaderCircle className="spin" />Saving</small> : null}</div><button className="studio-link" onClick={openWebsiteStudio}><Earth />Web Studio</button></header>
         <div className="chat-scroll-region">
           {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
           <div className="chat-feed" ref={feedRef} role="log" aria-label="AI chat messages" aria-live="polite" tabIndex={0}>
             {!project.messages.length ? <><div className="pan-message"><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>PAN · PROJECT AGENT</small><p>Tell me what you want to create. I’ll ask whenever an important detail is unclear.</p><p>To launch a coin, I’ll need its name, ticker and image. Website and X account are optional.</p></div></div><div className="suggestion-row"><button onClick={() => send("Help me shape the idea for my coin") }><MessageSquare />Shape my idea</button><button onClick={() => setImageOpen(true)}><Sparkles />Generate a logo</button><button onClick={openWebsiteStudio}><Earth />Build its website</button></div></> : null}
             {project.messages.map((item) => item.role === "user" ? <div className="user-message" key={item.id}>{item.content || item.message ? <p>{item.content || item.message}</p> : null}{item.attachments?.length ? <div className="message-images">{item.attachments.map((image, index) => <MessageImage key={image.id || image.url || index} image={image} fallbackAlt="Chat attachment" />)}</div> : null}</div> : <div className="pan-message" key={item.id}><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>PAN · PROJECT AGENT</small><p><InlineMarkdown>{item.content || item.message}</InlineMarkdown></p>{item.attachments?.length ? <div className="message-images">{item.attachments.map((image, index) => <MessageImage key={image.id || image.url || index} image={image} fallbackAlt="Generated image" />)}</div> : null}</div></div>)}
-            {thinking ? <div className={`pan-message thinking ${aiActivity === "website" ? "website-build-thinking" : aiActivity === "image" ? "image-build-thinking" : ""}`}><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>{aiActivity === "website" ? "PAN IS BUILDING YOUR WEBSITE" : aiActivity === "image" ? "PAN IS CREATING AN IMAGE" : resumedRunId ? "PAN IS STILL WORKING" : "PAN IS THINKING"}</small>{aiActivity === "image" ? <ImageGenerationSkeleton /> : aiActivity === "website" ? <p className="build-progress-copy">Build in progress. PAN is generating, validating and saving the Website Studio files.</p> : resumedRunId ? <p className="build-progress-copy">Your request is still running. You can leave this project and come back at any time.</p> : null}{aiActivity !== "image" ? <div className="thinking-dots"><i/><i/><i/></div> : null}</div></div> : null}
+            {busy ? <div className={`pan-message thinking ${visibleActivity === "website" ? "website-build-thinking" : visibleActivity === "image" ? "image-build-thinking" : ""}`}><span className="pan-avatar"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" /></span><div><small>{visibleActivity === "website" ? "PAN IS BUILDING YOUR WEBSITE" : visibleActivity === "image" ? "PAN IS CREATING AN IMAGE" : resumedRunId ? "PAN IS STILL WORKING" : "PAN IS THINKING"}</small>{visibleActivity === "image" ? <ImageGenerationSkeleton /> : visibleActivity === "website" ? <p className="build-progress-copy">Build in progress. PAN is generating, validating and saving the Website Studio files.</p> : resumedRunId ? <p className="build-progress-copy">Your request is still running. You can leave this project and come back at any time.</p> : null}{visibleActivity !== "image" ? <div className="thinking-dots"><i/><i/><i/></div> : null}</div></div> : null}
           </div>
         </div>
-        <div className="composer-dock"><div className="composer" onPaste={handlePaste}>{attachments.length ? <div className="attachment-strip">{attachments.map((image) => <div key={image.id}><img src={image.dataUrl} alt={image.fileName} /><button aria-label={`Remove ${image.fileName}`} onClick={() => setAttachments((old) => old.filter((item) => item.id !== image.id))}><X /></button><span>{image.fileName}</span></div>)}</div> : null}<textarea ref={messageInput} rows="1" aria-label="Message PAN" placeholder="Message PAN…" value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} /><div><span><button aria-label="Attach images" title="Upload images" onClick={() => chatImageInput.current?.click()}><Paperclip /></button><button aria-label="Generate image" title="Generate image" onClick={() => setImageOpen(true)}><ImageIcon /></button><button aria-label="Open Website Studio" title="Website Studio" onClick={openWebsiteStudio}><Earth /></button><input ref={chatImageInput} hidden multiple type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { addChatImages(e.target.files); e.target.value = ""; }}/></span><span className="composer-actions"><label>Performance<select aria-label="Performance" value={project.performance} onChange={(e) => selectPerformance(e.target.value)}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="extra_high">Extra high</option></select></label><button className="send-button" disabled={(!message.trim() && !attachments.length) || thinking} onClick={() => send()} aria-label="Send"><Send /></button></span></div></div></div>
+        <div className="composer-dock"><div className="composer" onPaste={handlePaste}>{attachments.length ? <div className="attachment-strip">{attachments.map((image) => <div key={image.id}><img src={image.dataUrl} alt={image.fileName} /><button aria-label={`Remove ${image.fileName}`} onClick={() => setAttachments((old) => old.filter((item) => item.id !== image.id))}><X /></button><span>{image.fileName}</span></div>)}</div> : null}<textarea ref={messageInput} rows="1" aria-label="Message PAN" placeholder="Message PAN…" value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} /><div><span><button aria-label="Attach images" title="Upload images" onClick={() => chatImageInput.current?.click()}><Paperclip /></button><button aria-label="Generate image" title="Generate image" onClick={() => setImageOpen(true)}><ImageIcon /></button><button aria-label="Open Website Studio" title="Website Studio" onClick={openWebsiteStudio}><Earth /></button><input ref={chatImageInput} hidden multiple type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { addChatImages(e.target.files); e.target.value = ""; }}/></span><span className="composer-actions"><label>Performance<select aria-label="Performance" value={project.performance} onChange={(e) => selectPerformance(e.target.value)}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="extra_high">Extra high</option></select></label><button className="send-button" disabled={(!message.trim() && !attachments.length) || busy} onClick={() => send()} aria-label="Send"><Send /></button></span></div></div></div>
       </section>
       <aside className="details-panel">
         {launched ? <CoinStats project={project} /> : <><div className="panel-title"><div><p>PROJECT OBJECT</p><h2>Coin details</h2></div><span className="completion">{complete}/3</span></div>
@@ -499,7 +667,7 @@ export function ProjectPage() {
           <div className="requirements">{Object.entries(required).map(([key, value]) => <span className={value ? "done" : ""} key={key}><i />{key === "name" ? "Name" : key === "ticker" ? "Ticker" : "Image"}</span>)}</div>
           <Button className="launch-button" disabled={complete !== 3} onClick={() => setLaunchOpen(true)}><Rocket />Launch coin</Button><small className="button-caption">{complete === 3 ? "Review launch funding and wallet" : "Complete the three required details"}</small></>}
       </aside>
-      {imageOpen ? <Modal title="Generate coin artwork" subtitle="OpenAI image generation uses your selected performance level." onClose={() => setImageOpen(false)}><div className="modal-body"><label className="field"><span>Describe the image</span><textarea rows="5" value={imagePrompt} onChange={(e) => setImagePrompt(e.target.value)} placeholder="A neon green frog mascot, bold coin logo, dark background…" /></label><div className="modal-actions"><Button variant="ghost" onClick={() => setImageOpen(false)}>Cancel</Button><Button loading={thinking} disabled={!imagePrompt.trim()} onClick={generateImage}><Sparkles />Generate image</Button></div></div></Modal> : null}
+      {imageOpen ? <Modal title="Generate coin artwork" subtitle="OpenAI image generation uses your selected performance level." onClose={() => setImageOpen(false)}><div className="modal-body"><label className="field"><span>Describe the image</span><textarea rows="5" value={imagePrompt} onChange={(e) => setImagePrompt(e.target.value)} placeholder="A neon green frog mascot, bold coin logo, dark background…" /></label><div className="modal-actions"><Button variant="ghost" onClick={() => setImageOpen(false)}>Cancel</Button><Button loading={busy} disabled={!imagePrompt.trim() || busy} onClick={generateImage}><Sparkles />Generate image</Button></div></div></Modal> : null}
       {launchOpen ? <Modal title={`Launch ${project.coinName}`} subtitle="PAN verifies the live Pons fee and developer-buy limit before creating the transaction." onClose={() => setLaunchOpen(false)}><div className="modal-body"><div className="launch-summary"><span>{project.imageUrl ? <img src={mediaUrl(project.imageUrl)} alt="" /> : <Coins />}</span><div><strong>{project.coinName}</strong><small>${project.ticker} · Robinhood Chain</small></div></div><div className="two-fields"><Field label="Dev buy (ETH)" optional><input type="number" min="0" step="0.001" value={launch.devBuyEth} onChange={(e) => setLaunch({ ...launch, devBuyEth: e.target.value })}/></Field><Field label="Creator fee wallet" optional><input value={launch.feeWalletAddress} onChange={(e) => setLaunch({ ...launch, feeWalletAddress: e.target.value.trim() })} placeholder="Defaults to launch wallet" /></Field></div><label className="field"><span>Launch wallet</span><select value={launch.walletMode} onChange={(e) => setLaunch({ ...launch, walletMode: e.target.value })}><option value="account">PAN account wallet</option><option value="connected">Connected external wallet</option></select></label>{launch.walletMode === "connected" ? <Notice>Your connected wallet will ask you to confirm the launch transaction. PAN never receives its private key.</Notice> : null}<div className="modal-actions"><Button variant="ghost" onClick={() => setLaunchOpen(false)}>Cancel</Button><Button loading={thinking} disabled={Boolean(launch.feeWalletAddress) && !/^0x[a-fA-F0-9]{40}$/.test(launch.feeWalletAddress)} onClick={launchCoin}><Rocket />Verify fee and launch</Button></div></div></Modal> : null}
     </div>
   );
