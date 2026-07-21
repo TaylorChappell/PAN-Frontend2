@@ -292,14 +292,34 @@ const previewBridgeScript = String.raw`<script data-pan-preview-bridge>
           value: createMemoryStorage(),
         });
       } catch {
-        // Generated code must still guard direct storage access when the browser
-        // does not permit the Window property to be shadowed.
+        // Generated code must guard direct storage access if the browser does
+        // not permit the Window property to be shadowed.
       }
     }
   }
 
   const externalProtocols = new Set(["http:", "https:", "mailto:", "tel:", "sms:"]);
   const isSpecialHref = (href) => /^(?:javascript:|data:|blob:)/i.test(href);
+  const decode = (value) => {
+    try { return decodeURIComponent(value); } catch { return value; }
+  };
+  const cssEscape = (value) => {
+    if (window.CSS && typeof window.CSS.escape === "function") return window.CSS.escape(value);
+    return String(value).replace(/[^a-zA-Z0-9_-]/g, (character) => "\\" + character);
+  };
+  const findNamedTarget = (value) => {
+    const id = decode(String(value || "").replace(/^#/, "").replace(/^\/+/, ""));
+    if (!id) return null;
+    return document.getElementById(id) || document.querySelector('[name="' + cssEscape(id) + '"]');
+  };
+
+  const sectionTargetFor = (rawHref, resolved) => {
+    if (rawHref.startsWith("#") && !rawHref.startsWith("#/")) return findNamedTarget(rawHref);
+    if (!resolved || resolved.origin !== PREVIEW_ORIGIN) return null;
+    const pathname = resolved.pathname.replace(/\/(?:index\.html?)?$/i, "").replace(/\.html?$/i, "");
+    const segment = pathname.split("/").filter(Boolean).pop() || "";
+    return findNamedTarget(segment) || findNamedTarget(resolved.hash);
+  };
 
   const internalHashFor = (rawHref) => {
     const resolved = new URL(rawHref, PREVIEW_ORIGIN + "/");
@@ -315,34 +335,46 @@ const previewBridgeScript = String.raw`<script data-pan-preview-bridge>
     if (popup) popup.opener = null;
   };
 
+  const scrollToTarget = (target) => {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   document.addEventListener("click", (event) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const target = event.target instanceof Element ? event.target.closest("a[href]") : null;
     if (!target) return;
 
     const rawHref = String(target.getAttribute("href") || "").trim();
-    if (!rawHref || rawHref === "#" || isSpecialHref(rawHref) || target.hasAttribute("download")) return;
+    if (!rawHref || isSpecialHref(rawHref) || target.hasAttribute("download")) return;
 
-    if (rawHref.startsWith("#")) {
-      if (rawHref.startsWith("#/")) return;
-      if (window.location.hash.startsWith("#/")) {
-        const anchorId = decodeURIComponent(rawHref.slice(1));
-        const anchorTarget = anchorId ? document.getElementById(anchorId) || document.querySelector('[name="' + CSS.escape(anchorId) + '"]') : null;
-        if (anchorTarget) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          anchorTarget.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-      }
+    // Placeholder links must never clear a HashRouter route. Clearing the hash
+    // was the main cause of generated previews turning into a blank screen.
+    if (rawHref === "#") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
       return;
     }
 
-    let resolved;
+    let resolved = null;
     try {
-      resolved = new URL(rawHref, PREVIEW_ORIGIN + "/");
+      resolved = rawHref.startsWith("#") ? new URL(PREVIEW_ORIGIN + "/" + rawHref) : new URL(rawHref, PREVIEW_ORIGIN + "/");
     } catch {
       return;
     }
+
+    // A generated one-page site may use HashRouter and native #section links
+    // at the same time. HashRouter owns the hash, so navigate to the element
+    // without changing window.location.hash.
+    const sectionTarget = sectionTargetFor(rawHref, resolved);
+    if (sectionTarget) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      scrollToTarget(sectionTarget);
+      return;
+    }
+
+    // #/ paths are real HashRouter links. Let React Router handle them.
+    if (rawHref.startsWith("#/")) return;
 
     const isExternal = externalProtocols.has(resolved.protocol) && (
       !["http:", "https:"].includes(resolved.protocol) || resolved.origin !== PREVIEW_ORIGIN
