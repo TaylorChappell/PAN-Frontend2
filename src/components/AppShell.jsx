@@ -183,9 +183,9 @@ export function AppShell() {
 
   return (
     <div className={`app-shell ${studioMode ? "studio-mode" : ""}`}>
-      <button className="mobile-menu" onClick={() => setSidebarOpen(true)} aria-label="Open menu"><Menu /></button>
-      {sidebarOpen ? <button className="mobile-overlay" onClick={() => setSidebarOpen(false)} aria-label="Close menu" /> : null}
-      <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+      {!studioMode ? <button className="mobile-menu" onClick={() => setSidebarOpen(true)} aria-label="Open menu"><Menu /></button> : null}
+      {!studioMode && sidebarOpen ? <button className="mobile-overlay" onClick={() => setSidebarOpen(false)} aria-label="Close menu" /> : null}
+      {!studioMode ? <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="sidebar-top">
           <div className="brand-row"><Link to="/" className="brand"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" />PAN.AI</Link><button className="mobile-close" onClick={() => setSidebarOpen(false)}><X /></button></div>
           <Button className="new-project" onClick={createProject}>New project</Button>
@@ -217,7 +217,7 @@ export function AppShell() {
             {initialLoading ? <><i className="account-avatar-skeleton"/><span className="account-copy-skeleton"><i/><i/></span></> : <>{avatar ? <img src={avatar} alt="" referrerPolicy="no-referrer" /> : <span className="avatar">{name.slice(0, 1).toUpperCase()}</span>}<span><strong>{creditBalance.toLocaleString()} credits</strong><small>{Number(ethBalance).toFixed(4)} ETH available</small></span></>}
           </Link>
         </div>
-      </aside>
+      </aside> : null}
       <main className="app-main">
         {!initialLoading && banner ? <div className="credit-banner"><Wallet size={17} /><span>{banner.text}</span><Link to="/credits" onClick={dismissBanner}>{banner.cta}</Link><button onClick={dismissBanner}><X size={16} /></button></div> : null}
         {initialLoading ? <ShellSkeleton /> : <Outlet context={{ projects, setProjects, account, reload }} />}

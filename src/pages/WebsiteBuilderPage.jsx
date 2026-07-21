@@ -16,8 +16,6 @@ import {
   FolderOpen,
   KeyRound,
   LoaderCircle,
-  Maximize2,
-  Minimize2,
   Play,
   Plus,
   Rocket,
@@ -267,63 +265,17 @@ function CodeEditor({ path, value, onChange, disabled }) {
 }
 
 
-const PREVIEW_VIEWPORT_WIDTH = 1280;
-const PREVIEW_VIEWPORT_HEIGHT = 720;
-
-function ScaledSitePreview({ frameRef, html, label, building, fullscreen, onToggleFullscreen }) {
-  const viewportRef = useRef(null);
-  const [viewportSize, setViewportSize] = useState({ width: PREVIEW_VIEWPORT_WIDTH, height: PREVIEW_VIEWPORT_HEIGHT });
-
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return undefined;
-
-    const updateSize = () => {
-      const rect = viewport.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) setViewportSize({ width: rect.width, height: rect.height });
-    };
-
-    updateSize();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateSize);
-    observer?.observe(viewport);
-    window.addEventListener("resize", updateSize);
-    window.addEventListener("orientationchange", updateSize);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("resize", updateSize);
-      window.removeEventListener("orientationchange", updateSize);
-    };
-  }, [fullscreen]);
-
-  const landscape = viewportSize.width > viewportSize.height;
-  const mobileViewport = fullscreen && !landscape;
-  const virtualWidth = mobileViewport ? Math.max(320, Math.round(viewportSize.width)) : PREVIEW_VIEWPORT_WIDTH;
-  const virtualHeight = mobileViewport ? Math.max(568, Math.round(viewportSize.height)) : PREVIEW_VIEWPORT_HEIGHT;
-  const scale = mobileViewport
-    ? Math.min(viewportSize.width / virtualWidth, viewportSize.height / virtualHeight)
-    : Math.min(viewportSize.width / PREVIEW_VIEWPORT_WIDTH, viewportSize.height / PREVIEW_VIEWPORT_HEIGHT);
-
-  return <div className={`site-preview ${fullscreen ? "preview-fullscreen" : ""}`}>
-    <div className="browser-bar"><i/><i/><i/><span>{label}</span><button className="preview-expand-button" type="button" onClick={onToggleFullscreen} aria-label={fullscreen ? "Exit full screen website preview" : "Open website preview full screen"}>{fullscreen ? <Minimize2/> : <Maximize2/>}<b>{fullscreen ? "Exit" : "Full screen"}</b></button></div>
-    <div className="site-preview-viewport" ref={viewportRef}>
-      <div
-        className="site-preview-scaler"
-        style={{
-          width: virtualWidth,
-          height: virtualHeight,
-          transform: `translate(-50%, -50%) scale(${scale})`,
-        }}
-      >
-        <iframe
-          ref={frameRef}
-          title="Website preview"
-          sandbox="allow-scripts allow-forms allow-modals"
-          scrolling="yes"
-          srcDoc={html}
-          style={{ width: virtualWidth, height: virtualHeight }}
-        />
-      </div>
-      {fullscreen ? <div className="preview-fullscreen-controls"><span>{landscape ? "Desktop preview" : "Mobile preview"}</span><button type="button" onClick={onToggleFullscreen}><Minimize2/>Exit</button></div> : null}
+function SitePreview({ frameRef, html, label, building }) {
+  return <div className="site-preview">
+    <div className="browser-bar"><i/><i/><i/><span>{label}</span></div>
+    <div className="site-preview-viewport">
+      <iframe
+        ref={frameRef}
+        title="Website preview"
+        sandbox="allow-scripts allow-forms allow-modals"
+        scrolling="yes"
+        srcDoc={html}
+      />
       {building ? <div className="preview-building-overlay"><LoaderCircle className="spin"/><strong>Building website</strong><small>The preview will refresh when validation finishes.</small></div> : null}
     </div>
   </div>;
@@ -339,7 +291,6 @@ export function WebsiteBuilderPage() {
   const [selected, setSelected] = useState("src/App.tsx");
   const [expanded, setExpanded] = useState(new Set(["src"]));
   const [view, setView] = useState("preview");
-  const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -436,17 +387,6 @@ export function WebsiteBuilderPage() {
     return () => window.removeEventListener("message", handlePreviewRequest);
   }, [projectId, site?.id]);
 
-  useEffect(() => {
-    if (!previewFullscreen) return undefined;
-    document.body.classList.add("preview-fullscreen-open");
-    const closeOnEscape = (event) => { if (event.key === "Escape") setPreviewFullscreen(false); };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.classList.remove("preview-fullscreen-open");
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [previewFullscreen]);
-
   const currentFile = site?.files?.find((file) => file.path === selected) || site?.files?.[0];
   const fileTree = useMemo(() => buildFileTree(site?.files || []), [site?.files]);
   const previewHtml = useMemo(() => site?.previewHtml || site?.files?.find((file) => file.path === "pan-preview.html")?.content || site?.files?.find((file) => /(?:^|\/)index\.html$/.test(file.path))?.content || "", [site]);
@@ -524,7 +464,7 @@ export function WebsiteBuilderPage() {
   if (!site) return <EmptyState title="Website unavailable" text={error || "PAN could not load this website."} />;
 
   return <div className="builder-page">
-    <header className="builder-header"><div><p>PROJECT WEBSITE</p><input aria-label="Website name" value={site.name} onChange={(event) => setSite({ ...site, name: event.target.value })}/><span className={`status-pill ${site.status === "published" || site.status === "ready" ? "live" : "draft"}`}>{building ? "building" : site.status}</span></div><div><Button variant="ghost" onClick={() => navigate(`/projects/${projectId}`)}>Back to project</Button><Button variant="ghost" onClick={() => setEnvOpen(true)}><KeyRound/>ENV VARIABLES</Button><a className="button button-ghost builder-zip-button" href={site.zipUrl ? endpoints.sites.assetUrl(site.zipUrl) : "#"} onClick={(event) => !site.zipUrl && event.preventDefault()}><Download/>ZIP</a><Button className="builder-deploy-button" onClick={() => setDeployOpen(true)}><Rocket/><span className="export-label-desktop">Export & deploy</span><span className="export-label-mobile">Export</span></Button></div></header>
+    <header className="builder-header"><div><p>PROJECT WEBSITE</p><input aria-label="Website name" value={site.name} onChange={(event) => setSite({ ...site, name: event.target.value })}/><span className={`status-pill ${site.status === "published" || site.status === "ready" ? "live" : "draft"}`}>{building ? "building" : site.status}</span></div><div><Button variant="ghost" onClick={() => navigate(`/projects/${projectId}`)}>Back to project</Button><Button variant="ghost" onClick={() => setEnvOpen(true)}><KeyRound/>ENV VARIABLES</Button><a className="button button-ghost builder-zip-button" href={site.zipUrl ? endpoints.sites.assetUrl(site.zipUrl) : "#"} onClick={(event) => !site.zipUrl && event.preventDefault()}><Download/>ZIP</a><Button className="builder-deploy-button" onClick={() => setDeployOpen(true)}><Rocket/>Export & deploy</Button></div></header>
     {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
     <div className="builder-workspace">
       <aside className="builder-chat">
@@ -543,13 +483,11 @@ export function WebsiteBuilderPage() {
       </aside>
       <section className="builder-canvas">
         <div className="canvas-tabs"><div><button className={view === "preview" ? "active" : ""} onClick={() => setView("preview")}><Eye/>Preview</button><button className={view === "code" ? "active" : ""} onClick={() => setView("code")}><Code2/>Code</button></div><span>{building ? <><LoaderCircle className="spin"/>Build in progress</> : site.status === "failed" ? <>Build failed</> : <><Check/>Up to date</>}</span></div>
-        {view === "preview" ? <ScaledSitePreview
+        {view === "preview" ? <SitePreview
           frameRef={previewFrameRef}
           html={previewHtml}
           label={site.previewUrl || (site.runtime === "railway_node" ? "pan-preview.local · backend bridge active" : "pan-preview.local")}
           building={building}
-          fullscreen={previewFullscreen}
-          onToggleFullscreen={() => setPreviewFullscreen((value) => !value)}
         /> : <div className="code-workspace">
           <aside className="code-file-tree"><header><span>EXPLORER</span><small>{site.files.length} files</small></header><FileTree nodes={fileTree} expanded={expanded} selected={currentFile?.path} onToggle={(path) => setExpanded((old) => { const next = new Set(old); if (next.has(path)) next.delete(path); else next.add(path); return next; })} onSelect={setSelected}/></aside>
           <section><header><span><FileCode2 />{currentFile?.path}</span><div><small>{fileLanguage(currentFile?.path || "").toUpperCase()}</small><Button variant="ghost" onClick={saveFile} loading={running}><Save/>Save</Button></div></header><CodeEditor path={currentFile?.path} value={currentFile?.content || ""} onChange={updateFile} disabled={!currentFile || building}/><footer><span>Tab to indent</span><span>Shift + Tab to outdent</span><span>{currentFile?.content?.split("\n").length || 0} lines</span></footer></section>
