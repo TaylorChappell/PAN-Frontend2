@@ -50,6 +50,15 @@ function activityForRun(run) {
   return "thinking";
 }
 
+function initialActivityForPrompt(prompt, hint) {
+  if (["image", "website", "thinking"].includes(hint)) return hint;
+  const value = String(prompt || "");
+  const action = /\b(?:generate|create|make|design|draw|render|produce)\b/i.test(value);
+  if (action && /\b(?:image|logo|art|artwork|banner|mascot|icon|illustration|picture|graphic|visual)\b/i.test(value)) return "image";
+  if (action && /\b(?:website|site|landing page|web app|webpage)\b/i.test(value)) return "website";
+  return "thinking";
+}
+
 function projectFields(data) {
   const normalized = normalizeProject(data);
   const { messages: _messages, performance: _performance, ...fields } = normalized;
@@ -348,13 +357,13 @@ export function ProjectPage() {
     if (images.length) { event.preventDefault(); addChatImages(images); }
   };
 
-  const send = async (text = message) => {
+  const send = async (text = message, activityHint = null) => {
     const clean = text.trim(); if ((!clean && !attachments.length) || thinking) return;
     const outgoingAttachments = attachments;
     setError(""); setMessage(""); setAttachments([]);
     const userMessage = { id: crypto.randomUUID(), role: "user", content: clean, attachments: outgoingAttachments };
     websiteNavigationRef.current = false;
-    setProject((old) => ({ ...old, messages: [...old.messages, userMessage] })); setAiActivity("thinking"); setThinking(true);
+    setProject((old) => ({ ...old, messages: [...old.messages, userMessage] })); setAiActivity(initialActivityForPrompt(clean, activityHint)); setThinking(true);
     try {
       const id = await ensureProject();
       setProjects((old) => old.map((item) => (item.id || item.projectId) === id ? { ...item, activeRun: { id: `pending-${userMessage.id}`, projectId: id, kind: "chat", status: "queued" } } : item));
@@ -437,7 +446,7 @@ export function ProjectPage() {
     }
     setImageOpen(false);
     setImagePrompt("");
-    await send(`Generate a coin logo image for this project using this brief: ${prompt}`);
+    await send(`Generate a coin logo image for this project using this brief: ${prompt}`, "image");
   };
 
   const launchCoin = async () => {
