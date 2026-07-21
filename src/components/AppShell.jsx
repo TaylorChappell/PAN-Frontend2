@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { CircleHelp, FileText, LoaderCircle, MoreHorizontal, Pencil, Plus, Settings, ShieldCheck, Trash2, Wallet, X } from "lucide-react";
+import { CircleHelp, FileText, LoaderCircle, Menu, MoreHorizontal, Pencil, Settings, ShieldCheck, Trash2, Wallet, X } from "lucide-react";
 import { endpoints, mediaUrl } from "../api";
 import { useAuth } from "../auth";
 import { Button, Modal, Notice } from "./UI";
@@ -15,22 +15,6 @@ function balanceFrom(data, user) {
 
 function accountPayload(data) {
   return data?.account ? { ...data, ...data.account } : data;
-}
-
-
-function mobileTitle(pathname, projects) {
-  const projectMatch = pathname.match(/^\/projects\/([^/]+)/);
-  if (projectMatch) {
-    const id = decodeURIComponent(projectMatch[1]);
-    const project = projects.find((item) => String(item.id || item.projectId) === id);
-    if (pathname.includes("/website")) return "Web Studio";
-    return project?.name || project?.coinName || "PAN.AI";
-  }
-  if (pathname === "/credits") return "Credits & wallet";
-  if (pathname === "/settings") return "Settings";
-  if (pathname === "/support") return "Support";
-  if (pathname === "/admin") return "Admin";
-  return "New project";
 }
 
 function ShellSkeleton() {
@@ -56,8 +40,6 @@ export function AppShell() {
   const [error, setError] = useState("");
   const [acceptingTerms, setAcceptingTerms] = useState(false);
   const [termsChecked, setTermsChecked] = useState(false);
-  const edgeSwipe = useRef(null);
-  const drawerSwipe = useRef(null);
 
   const mergeAccount = useCallback((value) => {
     if (!value) return;
@@ -120,14 +102,6 @@ export function AppShell() {
   }, [account?.terms?.required, location.pathname, mergeAccount, refreshAccount]);
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
   useEffect(() => {
-    document.documentElement.classList.add("pan-workspace-active");
-    return () => document.documentElement.classList.remove("pan-workspace-active");
-  }, []);
-  useEffect(() => {
-    document.documentElement.classList.toggle("drawer-is-open", sidebarOpen);
-    return () => document.documentElement.classList.remove("drawer-is-open");
-  }, [sidebarOpen]);
-  useEffect(() => {
     if (!account?.terms?.required || sessionStorage.getItem("pan_terms_accept_intent") !== "1") return;
     setAcceptingTerms(true);
     endpoints.account.acceptTerms().then((result) => {
@@ -154,7 +128,6 @@ export function AppShell() {
 
   const createProject = () => {
     setError("");
-    setSidebarOpen(false);
     navigate("/", { state: { newProjectNonce: crypto.randomUUID() } });
   };
 
@@ -181,7 +154,6 @@ export function AppShell() {
 
   const name = user?.name || user?.username || user?.email || "PAN user";
   const avatar = user?.image || user?.avatarUrl || user?.picture;
-  const currentMobileTitle = mobileTitle(location.pathname, projects);
 
   const openProjectAction = (action, project) => {
     setProjectMenu(null);
@@ -209,61 +181,14 @@ export function AppShell() {
     finally { setProjectWorking(false); }
   };
 
-  const onShellTouchStart = (event) => {
-    if (sidebarOpen) return;
-    const touch = event.touches?.[0];
-    if (touch && touch.clientX <= 28) edgeSwipe.current = { x: touch.clientX, y: touch.clientY };
-  };
-
-  const onShellTouchEnd = (event) => {
-    const start = edgeSwipe.current;
-    edgeSwipe.current = null;
-    if (!start) return;
-    const touch = event.changedTouches?.[0];
-    if (!touch) return;
-    const dx = touch.clientX - start.x;
-    const dy = Math.abs(touch.clientY - start.y);
-    if (dx > 70 && dy < 80) setSidebarOpen(true);
-  };
-
-  const onDrawerTouchStart = (event) => {
-    const touch = event.touches?.[0];
-    if (touch) drawerSwipe.current = { x: touch.clientX, y: touch.clientY };
-  };
-
-  const onDrawerTouchEnd = (event) => {
-    const start = drawerSwipe.current;
-    drawerSwipe.current = null;
-    if (!start) return;
-    const touch = event.changedTouches?.[0];
-    if (!touch) return;
-    const dx = touch.clientX - start.x;
-    const dy = Math.abs(touch.clientY - start.y);
-    if (dx < -65 && dy < 90) setSidebarOpen(false);
-  };
-
   return (
-    <div
-      className={`app-shell ${studioMode ? "studio-mode" : ""}`}
-      onTouchStart={onShellTouchStart}
-      onTouchEnd={onShellTouchEnd}
-    >
-      <header className="mobile-app-bar">
-        <button className="mobile-drawer-trigger" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
-          <span className="menu-glyph" aria-hidden="true"><i /><i /><i /></span>
-        </button>
-        <strong title={currentMobileTitle}>{currentMobileTitle}</strong>
-        <button className="mobile-new-project" onClick={createProject} aria-label="New project"><Plus /></button>
-      </header>
+    <div className={`app-shell ${studioMode ? "studio-mode" : ""}`}>
+      <button className="mobile-menu" onClick={() => setSidebarOpen(true)} aria-label="Open menu"><Menu /></button>
       {sidebarOpen ? <button className="mobile-overlay" onClick={() => setSidebarOpen(false)} aria-label="Close menu" /> : null}
-      <aside
-        className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}
-        onTouchStart={onDrawerTouchStart}
-        onTouchEnd={onDrawerTouchEnd}
-      >
+      <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="sidebar-top">
-          <div className="brand-row"><Link to="/" className="brand"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" />PAN.AI</Link><button className="mobile-close" onClick={() => setSidebarOpen(false)} aria-label="Close menu"><X /></button></div>
-          <Button className="new-project" onClick={createProject}><Plus size={18} />New project</Button>
+          <div className="brand-row"><Link to="/" className="brand"><img src={`${import.meta.env.BASE_URL}PanLogo.png`} alt="" />PAN.AI</Link><button className="mobile-close" onClick={() => setSidebarOpen(false)}><X /></button></div>
+          <Button className="new-project" onClick={createProject}>New project</Button>
           {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
           <p className="side-label">PROJECTS</p>
           <nav className="project-list">

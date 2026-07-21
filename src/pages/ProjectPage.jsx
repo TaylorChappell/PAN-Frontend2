@@ -481,7 +481,7 @@ export function ProjectPage() {
   return (
     <div className="project-page">
       <section className="chat-column">
-        <header className="project-header"><div><h1>{project.coinName || project.name || "Untitled coin"}</h1><span className={`status-pill ${launched ? "live" : "draft"}`}>{launched ? "Live" : project.status || "Draft"}</span>{saving ? <small><LoaderCircle className="spin" />Saving</small> : null}</div><button className="studio-link" onClick={openWebsiteStudio}><Earth />Website studio</button></header>
+        <header className="project-header"><div><h1>{project.coinName || project.name || "Untitled coin"}</h1><span className={`status-pill ${launched ? "live" : "draft"}`}>{launched ? "Live" : project.status || "Draft"}</span>{saving ? <small><LoaderCircle className="spin" />Saving</small> : null}</div></header>
         <div className="chat-scroll-region">
           {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
           <div className="chat-feed" ref={feedRef} role="log" aria-label="AI chat messages" aria-live="polite" tabIndex={0}>
