@@ -1,12 +1,4 @@
-Changed files in this patch:
-
-src/pages/HomePage.jsx
-- Removed “Hover or focus each step”.
-- Removed the rotating orbit/node graphic from the workflow section.
-- Removed the now-unused Image icon import.
-
+src/components/AppShell.jsx
+src/pages/WebsiteBuilderPage.jsx
 src/styles.css
-- Made the workflow copy occupy a centred single-column layout after removing the graphic.
-- Centred and reduced the hive graphic on tablet and mobile.
-- Reduced and clipped the hero workspace preview so it stays inside narrow mobile screens.
-- Added an extra fit adjustment for phones 390px wide and below.
+dist/**

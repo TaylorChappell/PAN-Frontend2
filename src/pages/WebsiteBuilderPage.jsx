@@ -265,16 +265,150 @@ function CodeEditor({ path, value, onChange, disabled }) {
 }
 
 
+const previewBridgeScript = String.raw`<script data-pan-preview-bridge>
+(() => {
+  const PREVIEW_ORIGIN = "https://preview.panapp.local";
+
+  const createMemoryStorage = () => {
+    const values = new Map();
+    return {
+      get length() { return values.size; },
+      clear() { values.clear(); },
+      getItem(key) { key = String(key); return values.has(key) ? values.get(key) : null; },
+      key(index) { return Array.from(values.keys())[Number(index)] ?? null; },
+      removeItem(key) { values.delete(String(key)); },
+      setItem(key, value) { values.set(String(key), String(value)); },
+    };
+  };
+
+  for (const name of ["localStorage", "sessionStorage"]) {
+    try {
+      void window[name];
+    } catch {
+      try {
+        Object.defineProperty(window, name, {
+          configurable: true,
+          enumerable: true,
+          value: createMemoryStorage(),
+        });
+      } catch {
+        // Generated code must still guard direct storage access when the browser
+        // does not permit the Window property to be shadowed.
+      }
+    }
+  }
+
+  const externalProtocols = new Set(["http:", "https:", "mailto:", "tel:", "sms:"]);
+  const isSpecialHref = (href) => /^(?:javascript:|data:|blob:)/i.test(href);
+
+  const internalHashFor = (rawHref) => {
+    const resolved = new URL(rawHref, PREVIEW_ORIGIN + "/");
+    let pathname = resolved.pathname || "/";
+    pathname = pathname.replace(/\/index\.html?$/i, "/");
+    pathname = pathname.replace(/\.html?$/i, "");
+    if (!pathname.startsWith("/")) pathname = "/" + pathname;
+    return "#" + pathname + resolved.search + resolved.hash;
+  };
+
+  const openExternal = (href) => {
+    const popup = window.open(href, "_blank", "noopener,noreferrer");
+    if (popup) popup.opener = null;
+  };
+
+  document.addEventListener("click", (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const target = event.target instanceof Element ? event.target.closest("a[href]") : null;
+    if (!target) return;
+
+    const rawHref = String(target.getAttribute("href") || "").trim();
+    if (!rawHref || rawHref === "#" || isSpecialHref(rawHref) || target.hasAttribute("download")) return;
+
+    if (rawHref.startsWith("#")) {
+      if (rawHref.startsWith("#/")) return;
+      if (window.location.hash.startsWith("#/")) {
+        const anchorId = decodeURIComponent(rawHref.slice(1));
+        const anchorTarget = anchorId ? document.getElementById(anchorId) || document.querySelector('[name="' + CSS.escape(anchorId) + '"]') : null;
+        if (anchorTarget) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          anchorTarget.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
+      return;
+    }
+
+    let resolved;
+    try {
+      resolved = new URL(rawHref, PREVIEW_ORIGIN + "/");
+    } catch {
+      return;
+    }
+
+    const isExternal = externalProtocols.has(resolved.protocol) && (
+      !["http:", "https:"].includes(resolved.protocol) || resolved.origin !== PREVIEW_ORIGIN
+    );
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    if (isExternal) {
+      openExternal(resolved.href);
+      return;
+    }
+
+    const nextHash = internalHashFor(rawHref);
+    if (window.location.hash === nextHash) {
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    } else {
+      window.location.hash = nextHash;
+    }
+  }, true);
+
+  document.addEventListener("submit", (event) => {
+    const form = event.target instanceof HTMLFormElement ? event.target : null;
+    if (!form || String(form.method || "get").toLowerCase() !== "get") return;
+
+    const action = String(form.getAttribute("action") || "").trim();
+    if (!action || /^https?:\/\//i.test(action)) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    const params = new URLSearchParams(new FormData(form));
+    const route = internalHashFor(action || "/");
+    const separator = route.includes("?") ? "&" : "?";
+    window.location.hash = params.size ? route + separator + params.toString() : route;
+  }, true);
+})();
+</script>`;
+
+function preparePreviewHtml(value) {
+  const html = String(value || "");
+  if (!html) return html;
+
+  const withoutOldBridge = html.replace(/<script\b[^>]*data-pan-preview-bridge[^>]*>[\s\S]*?<\/script>/gi, "");
+  const withoutPreviewCsp = withoutOldBridge.replace(/<meta\b[^>]*http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, "");
+  const headMatch = withoutPreviewCsp.match(/<head\b[^>]*>/i);
+  if (headMatch?.index !== undefined) {
+    const insertAt = headMatch.index + headMatch[0].length;
+    return `${withoutPreviewCsp.slice(0, insertAt)}${previewBridgeScript}${withoutPreviewCsp.slice(insertAt)}`;
+  }
+  return `${previewBridgeScript}${withoutPreviewCsp}`;
+}
+
 function SitePreview({ frameRef, html, label, building }) {
+  const previewDocument = useMemo(() => preparePreviewHtml(html), [html]);
+
   return <div className="site-preview">
     <div className="browser-bar"><i/><i/><i/><span>{label}</span></div>
     <div className="site-preview-viewport">
       <iframe
         ref={frameRef}
         title="Website preview"
-        sandbox="allow-scripts allow-forms allow-modals"
+        sandbox="allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads"
+        referrerPolicy="no-referrer"
         scrolling="yes"
-        srcDoc={html}
+        srcDoc={previewDocument}
       />
       {building ? <div className="preview-building-overlay"><LoaderCircle className="spin"/><strong>Building website</strong><small>The preview will refresh when validation finishes.</small></div> : null}
     </div>
