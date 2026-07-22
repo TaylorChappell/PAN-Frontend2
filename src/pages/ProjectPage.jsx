@@ -65,6 +65,18 @@ function projectFields(data) {
   return fields;
 }
 
+function mergeConversationMessages(serverMessages, localMessages) {
+  const server = Array.isArray(serverMessages) ? serverMessages : [];
+  const merged = [...server];
+  for (const local of localMessages || []) {
+    if (!local?.optimistic) continue;
+    const content = String(local.content || local.message || "").trim();
+    const duplicate = server.some((item) => item.role === local.role && String(item.content || item.message || "").trim() === content);
+    if (!duplicate && !merged.some((item) => item.id === local.id)) merged.push(local);
+  }
+  return merged;
+}
+
 function MessageImage({ image, fallbackAlt }) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -118,8 +130,12 @@ export function ProjectPage() {
   const { setProjects, account, reload } = useOutletContext();
   const accountPerformance = normalizePerformance(account?.settings?.performance);
   const accountPerformanceRef = useRef(accountPerformance);
-  const [project, setProject] = useState(() => ({ ...blankProject, performance: accountPerformance }));
-  const [loading, setLoading] = useState(Boolean(projectId));
+  const routeSnapshot = location.state?.projectSnapshot && (location.state.projectSnapshot.id || location.state.projectSnapshot.projectId) === projectId
+    ? normalizeProject(location.state.projectSnapshot, accountPerformance)
+    : null;
+  const hasRouteSnapshot = Boolean(routeSnapshot);
+  const [project, setProject] = useState(() => routeSnapshot || ({ ...blankProject, performance: accountPerformance }));
+  const [loading, setLoading] = useState(Boolean(projectId) && !hasRouteSnapshot);
   const [saving, setSaving] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [aiActivity, setAiActivity] = useState("thinking");
@@ -163,17 +179,18 @@ export function ProjectPage() {
       setLoading(false);
       return;
     }
-    setLoading(true); setError("");
+    if (!hasRouteSnapshot) setLoading(true);
+    setError("");
     endpoints.projects.get(projectId).then((data) => {
       const next = normalizeProject(data, accountPerformanceRef.current);
       const activeRun = activeRunFrom(data);
-      setProject(next);
+      setProject((old) => ({ ...next, messages: mergeConversationMessages(next.messages, old.messages) }));
       setThinking(Boolean(activeRun));
       setResumedRunId(activeRun?.id || null);
       setAiActivity(activityForRun(activeRun));
       setProjects((old) => old.map((item) => (item.id || item.projectId) === next.id ? { ...item, ...projectFields(data), activeRun } : item));
     }).catch((e) => setError(e.message)).finally(() => setLoading(false));
-  }, [location.state?.newProjectNonce, projectId, setProjects]);
+  }, [hasRouteSnapshot, location.state?.newProjectNonce, projectId, setProjects]);
 
   useEffect(() => {
     setProject((old) => old.performance === accountPerformance ? old : { ...old, performance: accountPerformance });
@@ -197,7 +214,7 @@ export function ProjectPage() {
           if (!active) return;
           const completedProject = normalizeProject(completed, accountPerformanceRef.current);
           const completedRun = completed?.runs?.find((run) => run.id === resumedRunId);
-          setProject(completedProject);
+          setProject((old) => ({ ...completedProject, messages: mergeConversationMessages(completedProject.messages, old.messages) }));
           setProjects((old) => old.map((item) => (item.id || item.projectId) === project.id ? { ...item, ...projectFields(completed), activeRun: null } : item));
           setThinking(false);
           setResumedRunId(null);
@@ -254,13 +271,12 @@ export function ProjectPage() {
   const launched = project.status === "live" || project.status === "launched" || Boolean(project.contractAddress || project.tokenAddress);
 
   const ensureProject = async () => {
-    if (project.id) return project.id;
+    if (project.id) return { id: project.id, created: false };
     const data = await endpoints.projects.create({ name: project.coinName || "Untitled coin", performance: project.performance });
     const created = normalizeProject(data);
     let hydrated = { ...created, performance: project.performance || "medium" };
     setProject((old) => ({ ...old, ...hydrated, messages: old.messages }));
     setProjects((old) => [hydrated, ...old.filter((item) => item.id !== created.id)]);
-    navigate(`/projects/${created.id}`, { replace: true });
 
     const initialChanges = {
       name: project.coinName || project.name || "Untitled coin",
@@ -285,7 +301,7 @@ export function ProjectPage() {
     } catch (metadataError) {
       setError(`The project was started, but some coin details could not be saved: ${metadataError.message}`);
     }
-    return created.id;
+    return { id: created.id, created: true };
   };
 
   const persist = async (changes) => {
@@ -361,11 +377,11 @@ export function ProjectPage() {
     const clean = text.trim(); if ((!clean && !attachments.length) || thinking) return;
     const outgoingAttachments = attachments;
     setError(""); setMessage(""); setAttachments([]);
-    const userMessage = { id: crypto.randomUUID(), role: "user", content: clean, attachments: outgoingAttachments };
+    const userMessage = { id: crypto.randomUUID(), role: "user", content: clean, attachments: outgoingAttachments, optimistic: true };
     websiteNavigationRef.current = false;
     setProject((old) => ({ ...old, messages: [...old.messages, userMessage] })); setAiActivity(initialActivityForPrompt(clean, activityHint)); setThinking(true);
     try {
-      const id = await ensureProject();
+      const { id, created } = await ensureProject();
       setProjects((old) => old.map((item) => (item.id || item.projectId) === id ? { ...item, activeRun: { id: `pending-${userMessage.id}`, projectId: id, kind: "chat", status: "queued" } } : item));
       const data = await endpoints.projects.message(id, {
         message: clean,
@@ -397,7 +413,7 @@ export function ProjectPage() {
       if (refreshed) {
         const refreshedProject = normalizeProject(refreshed, accountPerformanceRef.current);
         const nextActiveRun = activeRunFrom(refreshed);
-        setProject(refreshedProject);
+        setProject((old) => ({ ...refreshedProject, messages: mergeConversationMessages(refreshedProject.messages, old.messages) }));
         setProjects((old) => old.map((item) => (item.id || item.projectId) === id
           ? { ...item, ...projectFields(refreshed), activeRun: nextActiveRun }
           : item));
@@ -416,6 +432,7 @@ export function ProjectPage() {
       reload();
       if (data?.website?.id && ["ready", "published"].includes(data.website.status)) navigate(`/projects/${id}/website/${data.website.id}`);
       else if (data?.website?.status === "failed") setError(data.website.errorMessage || "Website Studio could not complete the build.");
+      else if (created && refreshed) navigate(`/projects/${id}`, { replace: true, state: { projectSnapshot: normalizeProject(refreshed, accountPerformanceRef.current) } });
     } catch (e) {
       setError(e.message);
       setAttachments(outgoingAttachments);
@@ -481,7 +498,7 @@ export function ProjectPage() {
   return (
     <div className="project-page">
       <section className="chat-column">
-        <header className="project-header"><div><h1>{project.coinName || project.name || "Untitled coin"}</h1><span className={`status-pill ${launched ? "live" : "draft"}`}>{launched ? "Live" : project.status || "Draft"}</span>{saving ? <small><LoaderCircle className="spin" />Saving</small> : null}</div></header>
+        <header className="project-header"><div><h1>{project.coinName || project.name || "Untitled coin"}</h1><span className={`status-pill ${launched ? "live" : "draft"}`}>{launched ? "Live" : project.status || "Draft"}</span>{saving ? <small><LoaderCircle className="spin" />Saving</small> : null}</div><button className="studio-link" type="button" onClick={openWebsiteStudio}><Earth />Web Studio</button></header>
         <div className="chat-scroll-region">
           {error ? <Notice onClose={() => setError("")}>{error}</Notice> : null}
           <div className="chat-feed" ref={feedRef} role="log" aria-label="AI chat messages" aria-live="polite" tabIndex={0}>
